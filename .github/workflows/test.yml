@@ -12,4 +12,6 @@ jobs:
       uses: actions/setup-go@v2.1.3
       with:
         go-version: 1.17
-    - run: go test -v    
+    - name: Run coverage
+      run: go test -coverprofile=coverage.txt -covermode=atomic
+    - uses: codecov/codecov-action@v2
