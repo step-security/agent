@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - int
+      
 jobs:
   integration-test:
-    permissions:
-      contents: read
-      id-token: write      
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -22,8 +20,8 @@ jobs:
     - name: Configure aws credentials
       uses: aws-actions/configure-aws-credentials@master
       with:
-        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        role-session-name: agent-int
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-west-2
     - run: aws s3 cp ./agent s3://step-security-agent/$GITHUB_REF/agent --acl public-read
     - name: Integration test
