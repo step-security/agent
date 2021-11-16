@@ -1,0 +1,32 @@
+name: IntegrationTest
+
+on:
+  push:
+    branches:
+      - int
+jobs:
+  integration-test:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Set up Go 
+      uses: actions/setup-go@v2.1.3
+      with:
+        go-version: 1.17
+    - run: go test -v
+    - run: go build -ldflags="-s -w" -o ./agent
+    - name: configure aws credentials
+      uses: aws-actions/configure-aws-credentials@master
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        role-session-name: agent-int
+        aws-region: us-west-2
+    - run: aws s3 cp ./agent s3://step-security-agent/$GITHUB_REF/agent --acl public-read
+    - name: Integration test
+      uses: docker://ghcr.io/step-security/integration-test/int:latest
+      env:
+        PAT: ${{ secrets.PAT }}
