@@ -96,11 +96,11 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 
 func (eventHandler *EventHandler) HandleEvent(event *Event) {
 	switch event.EventType {
-	case "netmon":
+	case netMonitorTag:
 		eventHandler.handleNetworkEvent(event)
-	case "filemon":
+	case fileMonitorTag:
 		eventHandler.handleFileEvent(event)
-	case "procmon":
+	case processMonitorTag:
 		eventHandler.handleProcessEvent()
 	}
 }

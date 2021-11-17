@@ -14,6 +14,12 @@ import (
 	"github.com/step-security/agent/pkg/artifact"
 )
 
+const (
+	netMonitorTag     = "netmon"
+	fileMonitorTag    = "filemon"
+	processMonitorTag = "procmon"
+)
+
 type ProcessMonitor struct {
 	CorrelationId    string
 	Repo             string
@@ -76,7 +82,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	}
 
 	// files modified in working directory
-	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k modify-file", "/home/runner"))
+	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/runner", fileMonitorTag))
 
 	actualBytes, _ := rule.Build(r)
 
@@ -84,7 +90,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
-	r, _ = flags.Parse(fmt.Sprintf("-w %s -p wa -k modify-agent-folder", "/home/agent"))
+	r, _ = flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/agent", fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
@@ -92,7 +98,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	}
 
 	// syscall connect
-	r, _ = flags.Parse("-a exit,always -S connect -k netconn")
+	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S connect -k %s", netMonitorTag))
 
 	actualBytes, _ = rule.Build(r)
 
@@ -101,7 +107,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	}
 
 	// syscall process start
-	r, _ = flags.Parse("-a exit,always -S execve -k procmon")
+	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S execve -k %s", processMonitorTag))
 
 	actualBytes, _ = rule.Build(r)
 
@@ -170,15 +176,15 @@ func getValue(key string, eventMap map[string]interface{}) string {
 
 func isEventReady(event *Event) bool {
 	switch event.EventType {
-	case "netmon":
+	case netMonitorTag:
 		if event.IPAddress != "" && event.Port != "" {
 			return true
 		}
-	case "filemon":
+	case fileMonitorTag:
 		if event.FileName != "" && event.Path != "" {
 			return true
 		}
-	case "procmon":
+	case processMonitorTag:
 		if len(event.ProcessArguments) > 0 && event.Path != "" {
 			return true
 		}
