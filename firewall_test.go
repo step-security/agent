@@ -12,13 +12,13 @@ import (
 func Test_addAuditRules(t *testing.T) {
 	err := addAuditRules(nil)
 	if err != nil {
-		t.Errorf("Error not expected")
+		t.Errorf("Error not expected %v", err)
 	}
 
 	ipt, err := iptables.New()
 
 	if err != nil {
-		t.Errorf("Error not expected creating iptables")
+		t.Errorf("Error not expected creating iptables %v", err)
 	}
 
 	ipt.ClearChain("filter", "OUTPUT")
