@@ -67,40 +67,47 @@ func (eventHandler *EventHandler) handleProcessEvent() {
 }
 func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	eventHandler.netMutex.Lock()
-	cacheKey := fmt.Sprintf("%s%s%s", event.Pid, event.IPAddress, event.Port)
 
-	_, found := eventHandler.ProcessConnectionMap[cacheKey]
+	if strings.Compare(event.IPAddress, "127.0.0.53") != 0 && strings.Compare(event.IPAddress, "127.0.0.1") != 0 &&
+		strings.Compare(event.IPAddress, "::1") != 0 {
 
-	if !found {
-		image := GetContainerByPid(event.Pid)
-		checksum := ""
-		exe := ""
-		if image == "" {
+		cacheKey := fmt.Sprintf("%s%s%s", event.Pid, event.IPAddress, event.Port)
 
-			if event.Exe != "" {
-				checksum, _ = getProgramChecksum(event.Exe)
+		_, found := eventHandler.ProcessConnectionMap[cacheKey]
 
+		if !found {
+			//writeLog(fmt.Sprintf("handleNetworkEvent %v", event))
+			image := GetContainerByPid(event.Pid)
+			checksum := ""
+			exe := ""
+			if image == "" {
+
+				if event.Exe != "" {
+					checksum, _ = getProgramChecksum(event.Exe)
+
+				}
+				exe = filepath.Base(event.Exe)
+			} else {
+				event.Exe = image
+				checksum = image
+				exe = image
 			}
-			exe = filepath.Base(event.Exe)
-		} else {
-			event.Exe = image
-			checksum = image
-			exe = image
-		}
 
-		eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, "", event.Timestamp, exe, checksum)
-		eventHandler.ProcessConnectionMap[cacheKey] = true
+			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, "", event.Timestamp, exe, checksum)
+			eventHandler.ProcessConnectionMap[cacheKey] = true
+		}
 	}
+
 	eventHandler.netMutex.Unlock()
 }
 
 func (eventHandler *EventHandler) HandleEvent(event *Event) {
 	switch event.EventType {
-	case "netmon":
+	case netMonitorTag:
 		eventHandler.handleNetworkEvent(event)
-	case "filemon":
+	case fileMonitorTag:
 		eventHandler.handleFileEvent(event)
-	case "procmon":
+	case processMonitorTag:
 		eventHandler.handleProcessEvent()
 	}
 }

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/step-security/agent/pkg/artifact"
 )
 
 type DNSRecord struct {
@@ -89,12 +87,12 @@ func (apiclient *ApiClient) sendFileEvent(correlationId, repo, fileType string, 
 	return apiclient.sendApiRequest("POST", url, fileEvent)
 }
 
-func (apiclient *ApiClient) sendArtifact(correlationId, repo string, artifact artifact.Artifact) error {
+/*func (apiclient *ApiClient) sendArtifact(correlationId, repo string, artifact artifact.Artifact) error {
 
 	url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/artifact", apiclient.APIURL, repo, correlationId)
 
 	return apiclient.sendApiRequest("POST", url, artifact)
-}
+}*/
 
 func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{}) error {
 
