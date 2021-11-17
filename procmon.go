@@ -87,6 +87,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ := rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
+		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
@@ -94,6 +95,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
+		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
@@ -103,6 +105,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
+		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule for syscall connect")
 	}
 
@@ -112,6 +115,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
+		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule for syscall execve")
 	}
 
