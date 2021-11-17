@@ -240,11 +240,17 @@ func (p *ProcessMonitor) PrepareEvent(sequence int, eventMap map[string]interfac
 	}
 
 	// Current working directory
-	p.Events[sequence].Path = getValue("cwd", eventMap)
+	_, found = eventMap["cwd"]
+	if found {
+		p.Events[sequence].Path = getValue("cwd", eventMap)
+	}
 
 	// Connect
-	p.Events[sequence].IPAddress = getValue("addr", eventMap)
-	p.Events[sequence].Port = getValue("port", eventMap)
+	_, found = eventMap["addr"]
+	if found {
+		p.Events[sequence].IPAddress = getValue("addr", eventMap)
+		p.Events[sequence].Port = getValue("port", eventMap)
+	}
 
 	// Process start
 	argc, found := eventMap["argc"]
