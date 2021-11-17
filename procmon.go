@@ -59,7 +59,7 @@ type Event struct {
 }
 
 func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
-	writeLog("MonitorProcesses called")
+	writeLog("Monitor Processes called")
 
 	client, err := libaudit.NewAuditClient(nil)
 	if err != nil {
