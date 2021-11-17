@@ -174,17 +174,23 @@ func isPrivateIPAddress(ipAddress string) bool {
 		_, loopBackSubnet, _ = net.ParseCIDR(loopBackAddressRange)
 	}
 
-	if classAPrivateSubnet.Contains(net.IP(ipAddress)) {
+	ip := net.ParseIP(ipAddress)
+
+	if classAPrivateSubnet.Contains(ip) {
 		return true
 	}
 
-	if classBPrivateSubnet.Contains(net.IP(ipAddress)) {
+	if classBPrivateSubnet.Contains(ip) {
 		return true
 	}
 
-	if classCPrivateSubnet.Contains(net.IP(ipAddress)) {
+	if classCPrivateSubnet.Contains(ip) {
 		return true
 	}
 
-	return loopBackSubnet.Contains(net.IP(ipAddress))
+	if loopBackSubnet.Contains(ip) {
+		return true
+	}
+
+	return false
 }
