@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,6 +27,8 @@ type EventHandler struct {
 	netMutex             sync.RWMutex
 	fileMutex            sync.RWMutex
 }
+
+var classAPrivateSubnet, classBPrivateSubnet, classCPrivateSubnet, loopBackSubnet *net.IPNet
 
 func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	eventHandler.fileMutex.Lock()
@@ -68,8 +71,10 @@ func (eventHandler *EventHandler) handleProcessEvent() {
 func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	eventHandler.netMutex.Lock()
 
-	if strings.Compare(event.IPAddress, "127.0.0.53") != 0 && strings.Compare(event.IPAddress, "127.0.0.1") != 0 &&
-		strings.Compare(event.IPAddress, "::1") != 0 {
+	if !isPrivateIPAddress(event.IPAddress) &&
+		strings.Compare(event.IPAddress, "::1") != 0 &&
+		strings.Compare(event.IPAddress, AzureIPAddress) != 0 &&
+		strings.Compare(event.IPAddress, MetadataIPAddress) != 0 {
 
 		cacheKey := fmt.Sprintf("%s%s%s", event.Pid, event.IPAddress, event.Port)
 
@@ -153,4 +158,39 @@ func getProgramChecksum(path string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func isPrivateIPAddress(ipAddress string) bool {
+	if classAPrivateSubnet == nil {
+		_, classAPrivateSubnet, _ = net.ParseCIDR(classAPrivateAddressRange)
+	}
+	if classBPrivateSubnet == nil {
+		_, classBPrivateSubnet, _ = net.ParseCIDR(classBPrivateAddressRange)
+	}
+	if classCPrivateSubnet == nil {
+		_, classCPrivateSubnet, _ = net.ParseCIDR(classCPrivateAddressRange)
+	}
+	if loopBackSubnet == nil {
+		_, loopBackSubnet, _ = net.ParseCIDR(loopBackAddressRange)
+	}
+
+	ip := net.ParseIP(ipAddress)
+
+	if classAPrivateSubnet.Contains(ip) {
+		return true
+	}
+
+	if classBPrivateSubnet.Contains(ip) {
+		return true
+	}
+
+	if classCPrivateSubnet.Contains(ip) {
+		return true
+	}
+
+	if loopBackSubnet.Contains(ip) {
+		return true
+	}
+
+	return false
 }

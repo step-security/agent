@@ -8,22 +8,28 @@ import (
 )
 
 const (
-	filterTable      = "filter"
-	outputChain      = "OUTPUT"
-	dockerUserChain  = "DOCKER_USER"
-	dockerInterface  = "docker0"
-	defaultInterface = "eth0"
-	inbound          = "-i"
-	outbound         = "-o"
-	protocol         = "-p"
-	allProtocols     = "all"
-	tcp              = "tcp"
-	destination      = "-d"
-	destinationPort  = "--dport"
-	target           = "-j"
-	accept           = "ACCEPT"
-	reject           = "REJECT"
-	dnsServerIP      = "8.8.8.8"
+	filterTable               = "filter"
+	outputChain               = "OUTPUT"
+	dockerUserChain           = "DOCKER_USER"
+	dockerInterface           = "docker0"
+	defaultInterface          = "eth0"
+	inbound                   = "-i"
+	outbound                  = "-o"
+	protocol                  = "-p"
+	allProtocols              = "all"
+	tcp                       = "tcp"
+	destination               = "-d"
+	destinationPort           = "--dport"
+	target                    = "-j"
+	accept                    = "ACCEPT"
+	reject                    = "REJECT"
+	dnsServerIP               = "8.8.8.8"
+	classAPrivateAddressRange = "10.0.0.0/8"
+	classBPrivateAddressRange = "172.16.0.0/12"
+	classCPrivateAddressRange = "192.168.0.0/16"
+	loopBackAddressRange      = "127.0.0.0/8"
+	AzureIPAddress            = "168.63.129.16"
+	MetadataIPAddress         = "169.254.169.254"
 )
 
 type ipAddressEndpoint struct {
@@ -73,6 +79,44 @@ func addBlockRules(endpoints []ipAddressEndpoint, chain, netInterface, direction
 	// Allow 8.8.8.8 for dns
 	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
 		destination, dnsServerIP, target, accept)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to add rule")
+	}
+
+	// Allow AzureIPAddress
+	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
+		destination, AzureIPAddress, target, accept)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to add rule")
+	}
+
+	// Allow Metadata service
+	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
+		destination, MetadataIPAddress, target, accept)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to add rule")
+	}
+
+	// Allow private IP ranges
+	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, allProtocols,
+		destination, classAPrivateAddressRange, target, accept)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to add rule")
+	}
+
+	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, allProtocols,
+		destination, classBPrivateAddressRange, target, accept)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to add rule")
+	}
+
+	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, allProtocols,
+		destination, classCPrivateAddressRange, target, accept)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to add rule")
