@@ -5,9 +5,6 @@ package main
 
 import (
 	"fmt"
-	"strconv"
-	"sync"
-	"time"
 
 	"github.com/elastic/go-libaudit/v2"
 	"github.com/elastic/go-libaudit/v2/auparse"
