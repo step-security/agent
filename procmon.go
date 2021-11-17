@@ -170,7 +170,6 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 			continue
 		}
 
-		writeLog(fmt.Sprintf("type=%v msg=%v\n", rawEvent.Type, string(rawEvent.Data)))
 		message, err := auparse.Parse(rawEvent.Type, string(rawEvent.Data))
 		if err != nil {
 			return errors.Wrap(err, "parse failed.")
@@ -179,6 +178,7 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 
 		p.PrepareEvent(int(message.Sequence), eventMap)
 		if isEventReady(p.Events[int(message.Sequence)]) {
+			writeLog(fmt.Sprintf("event sent %v", p.Events[int(message.Sequence)]))
 			go eventHandler.HandleEvent(p.Events[int(message.Sequence)])
 		}
 
@@ -218,7 +218,7 @@ func (p *ProcessMonitor) PrepareEvent(sequence int, eventMap map[string]interfac
 	if !found {
 		p.Events[sequence] = &Event{}
 	}
-	writeLog(fmt.Sprintf("%v", eventMap))
+	//writeLog(fmt.Sprintf("%v", eventMap))
 	// Tags
 	value, found := eventMap["tags"]
 
