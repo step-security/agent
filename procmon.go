@@ -127,6 +127,8 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to set audit PID")
 	}
 
+	writeLog("receive called")
+
 	p.receive(client)
 }
 
@@ -150,7 +152,7 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 			continue
 		}
 
-		//writeToFile(fmt.Sprintf("type=%v msg=%v\n", rawEvent.Type, string(rawEvent.Data)))
+		writeLog(fmt.Sprintf("type=%v msg=%v\n", rawEvent.Type, string(rawEvent.Data)))
 		message, err := auparse.Parse(rawEvent.Type, string(rawEvent.Data))
 		if err != nil {
 			return errors.Wrap(err, "parse failed.")
