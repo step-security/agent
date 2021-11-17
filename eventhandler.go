@@ -72,6 +72,7 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	_, found := eventHandler.ProcessConnectionMap[cacheKey]
 
 	if !found {
+		writeLog(fmt.Sprintf("handleNetworkEvent %v", event))
 		image := GetContainerByPid(event.Pid)
 		checksum := ""
 		exe := ""
