@@ -32,6 +32,9 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/jobs/123/networkconnection", agentApiBaseUrl),
 		httpmock.NewStringResponder(200, ""))
 
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/jobs/123/fileevent", agentApiBaseUrl),
+		httpmock.NewStringResponder(200, ""))
+
 	tests := []struct {
 		name   string
 		fields fields
@@ -39,6 +42,8 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 	}{
 		{name: "netMonitorEvent", fields: fields{CorrelationId: "123", Repo: "owner/repo", ApiClient: apiclient, ProcessConnectionMap: make(map[string]bool)},
 			args: args{event: &Event{IPAddress: "2.2.2.2", Port: "443", EventType: netMonitorTag, Exe: "/path/to/exe"}}},
+		{name: "fileMonitorEvent", fields: fields{CorrelationId: "123", Repo: "owner/repo", ApiClient: apiclient, ProcessFileMap: make(map[string]bool)},
+			args: args{event: &Event{EventType: fileMonitorTag, Exe: "/path/to/exe", FileName: ".git/objects"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
