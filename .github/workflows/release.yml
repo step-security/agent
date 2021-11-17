@@ -7,8 +7,11 @@ on:
       
 jobs:
   release:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
+    - uses: step-security/harden-runner@main
     - name: Checkout
       uses: actions/checkout@v2
     - name: Set up Go 
