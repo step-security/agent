@@ -11,7 +11,6 @@ import (
 	"github.com/elastic/go-libaudit/v2/rule"
 	"github.com/elastic/go-libaudit/v2/rule/flags"
 	"github.com/pkg/errors"
-	"github.com/step-security/agent/pkg/artifact"
 )
 
 const (
@@ -30,7 +29,6 @@ type ProcessMonitor struct {
 	PidFileMap       map[string]bool
 	ProcessMap       map[string]*Process
 	mutex            sync.RWMutex
-	Artifacts        []artifact.Artifact
 }
 
 type Process struct {
@@ -39,7 +37,6 @@ type Process struct {
 	WorkingDirectory string
 	Arguments        []string
 	Scenario         string // npm publish, dotnet push are scenarios
-	Artifacts        []*artifact.Artifact
 	Timestamp        string
 }
 
