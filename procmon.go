@@ -59,12 +59,15 @@ type Event struct {
 }
 
 func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
+	writeLog("MonitorProcesses called")
 
 	client, err := libaudit.NewAuditClient(nil)
 	if err != nil {
 		errc <- errors.Wrap(err, "failed to new audit client")
 	}
 	defer client.Close()
+
+	writeLog("NewAuditClient created")
 
 	status, err := client.GetStatus()
 	if err != nil {
@@ -77,9 +80,13 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		}
 	}
 
+	writeLog("Status is enabled")
+
 	if _, err = client.DeleteRules(); err != nil {
 		errc <- errors.Wrap(err, "failed to delete audit rules")
 	}
+
+	writeLog("Rules deleted")
 
 	// files modified in working directory
 	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/runner", fileMonitorTag))
@@ -91,6 +98,8 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
+	writeLog("File monitor added")
+
 	r, _ = flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/agent", fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
 
@@ -98,6 +107,8 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
+
+	writeLog("Agent file monitor added")
 
 	// syscall connect
 	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S connect -k %s", netMonitorTag))
@@ -108,6 +119,8 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule for syscall connect")
 	}
+
+	writeLog("Net monitor added")
 
 	// syscall process start
 	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S execve -k %s", processMonitorTag))
@@ -125,6 +138,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 			return err
 		}
 	}*/
+	writeLog("Process monitor added")
 
 	// sending message to kernel registering our PID
 	if err = client.SetPID(libaudit.NoWait); err != nil {
