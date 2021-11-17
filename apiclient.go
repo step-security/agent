@@ -108,15 +108,30 @@ func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{})
 		req.Header.Add("Content-Type", "application/json; charset=UTF-8")
 	}
 
+	retryCounter := 0
+	var httpError error
+	for retryCounter < 3 {
+		_, httpError = apiclient.sendHttpRequest(req)
+		if httpError != nil {
+			retryCounter++
+		} else {
+			break
+		}
+	}
+
+	return httpError
+}
+
+func (apiclient *ApiClient) sendHttpRequest(req *http.Request) (*http.Response, error) {
 	resp, err := apiclient.Client.Do(req)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("API call error, status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("API call error, status code: %d", resp.StatusCode)
 	}
 
-	return nil
+	return resp, nil
 }
