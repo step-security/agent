@@ -11,6 +11,8 @@ import (
 	"github.com/florianl/go-nflog/v2"
 )
 
+const StepSecurityLogCorrelationPrefix = "Step Security Job Correlation ID:"
+
 type DNSServer interface {
 	ListenAndServe() error
 }
@@ -60,6 +62,8 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	// TODO: pass in an iowriter/ use log library
 	writeLog(fmt.Sprintf("read config %v", config))
+
+	writeLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 
 	// TODO: fix the cache and time
 	Cache := InitCache(10 * 60 * 1000000000) // 10 * 60 seconds
