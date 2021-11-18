@@ -41,4 +41,4 @@ jobs:
       uses: docker://ghcr.io/step-security/integration-test/int:latest
       env:
         PAT: ${{ secrets.PAT }}
-    - run: aws s3 cp ./agent s3://step-security-agent/refs/heads/beta/agent --acl public-read
+    - run: aws s3 cp ./agent s3://step-security-agent/refs/heads/agent/agent --acl public-read
