@@ -9,6 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: step-security/harden-runner@main
+      with:
+        allowed-endpoints: 
+          beta.api.stepsecurity.io:443
+          codecov.io:443
+          github.com:443
+          proxy.golang.org:443
+          storage.googleapis.com:443
     - name: Checkout
       uses: actions/checkout@v2
     - name: Set up Go 
