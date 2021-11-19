@@ -1,0 +1,44 @@
+name: Scorecard analysis workflow
+on:
+  push:
+    # Only the default branch is supported.
+    branches: [main]
+  pull_request:
+    # All branches are supported.
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+
+      - name: "Run analysis"
+        # TODO: pin our action.
+        uses: ossf/scorecard-actions/analyze@test/dogfood
+        with:
+          policy_file: .github/scorecard-policy.yml
+          results_file: results.sarif
+          results_format: sarif
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # https://docs.github.com/en/actions/advanced-guides/storing-workflow-data-as-artifacts
+      # Optional.
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@v2
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: "Upload SARIF results"
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: results.sarif
