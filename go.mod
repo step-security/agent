@@ -8,7 +8,7 @@ require (
 	github.com/florianl/go-nflog/v2 v2.0.0
 	github.com/google/gopacket v1.1.19
 	github.com/jarcoal/httpmock v1.0.8
-	github.com/miekg/dns v1.1.25
+	github.com/miekg/dns v1.1.43
 	github.com/pkg/errors v0.9.1
 )
 
