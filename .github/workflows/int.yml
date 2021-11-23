@@ -4,14 +4,16 @@ on:
   pull_request:
     branches:
       - int
-      
+
+permissions: read-all
+
 jobs:
   integration-test:
     permissions:
       contents: read
     runs-on: ubuntu-latest
     steps:
-    - uses: step-security/harden-runner@main
+    - uses: step-security/harden-runner@7206db2ec98c5538323a6d70e51f965d55c11c87
       with:
        allowed-endpoints: 
         api.github.com:443
@@ -24,15 +26,15 @@ jobs:
         storage.googleapis.com:443
         sts.us-west-2.amazonaws.com:443        
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@629c2de402a417ea7690ca6ce3f33229e27606a5
     - name: Set up Go 
-      uses: actions/setup-go@v2.1.3
+      uses: actions/setup-go@37335c7bb261b353407cff977110895fa0b4f7d8
       with:
         go-version: 1.17
     - run: sudo go test -v
     - run: go build -ldflags="-s -w" -o ./agent
     - name: Configure aws credentials
-      uses: aws-actions/configure-aws-credentials@master
+      uses: aws-actions/configure-aws-credentials@ea7b857d8a33dc2fb4ef5a724500044281b49a5e
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
