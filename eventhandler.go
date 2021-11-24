@@ -168,11 +168,9 @@ func getProgramChecksum(path string) (string, error) {
 func (eventHandler *EventHandler) GetToolChain(PPid, exe string) *Tool {
 	checksum, _ := getProgramChecksum(exe)
 	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
-
 	parentProcess, found := eventHandler.ProcessMap[PPid]
-	for found {
+	if found {
 		tool.Parent = eventHandler.GetToolChain(parentProcess.PPid, parentProcess.Exe)
-		parentProcess, found = eventHandler.ProcessMap[PPid]
 	}
 
 	return &tool
