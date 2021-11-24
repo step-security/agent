@@ -170,7 +170,7 @@ func (eventHandler *EventHandler) GetToolChain(PPid, exe string) *Tool {
 	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
 
 	parentProcessId, err := getParentProcessId(PPid)
-	if err != nil {
+	if err == nil {
 		path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", PPid))
 		if err == nil {
 			tool.Parent = eventHandler.GetToolChain(fmt.Sprintf("%d", parentProcessId), path)
