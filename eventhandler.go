@@ -26,6 +26,7 @@ type EventHandler struct {
 	ProcessMap           map[string]*Process
 	netMutex             sync.RWMutex
 	fileMutex            sync.RWMutex
+	procMutex            sync.RWMutex
 }
 
 var classAPrivateSubnet, classBPrivateSubnet, classCPrivateSubnet, loopBackSubnet *net.IPNet
@@ -56,18 +57,27 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 
 		if fileType != "" {
-			toolChecksum, _ := getProgramChecksum(event.Exe)
-			exe := filepath.Base(event.Exe)
-			eventHandler.ApiClient.sendFileEvent(eventHandler.CorrelationId, eventHandler.Repo, fileType, event.Timestamp, exe, toolChecksum)
+			tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
+			eventHandler.ApiClient.sendFileEvent(eventHandler.CorrelationId, eventHandler.Repo, fileType, event.Timestamp, tool)
 			eventHandler.ProcessFileMap[event.Pid] = true
 		}
 	}
 
 	eventHandler.fileMutex.Unlock()
 }
-func (eventHandler *EventHandler) handleProcessEvent() {
 
+func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
+	eventHandler.procMutex.Lock()
+
+	_, found := eventHandler.ProcessMap[event.Pid]
+
+	if !found {
+		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
+	}
+
+	eventHandler.procMutex.Unlock()
 }
+
 func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	eventHandler.netMutex.Lock()
 
@@ -82,23 +92,18 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 
 		if !found {
 			//writeLog(fmt.Sprintf("handleNetworkEvent %v", event))
+			tool := Tool{}
 			image := GetContainerByPid(event.Pid)
-			checksum := ""
-			exe := ""
 			if image == "" {
-
 				if event.Exe != "" {
-					checksum, _ = getProgramChecksum(event.Exe)
-
+					tool = *eventHandler.GetToolChain(event.PPid, event.Exe)
 				}
-				exe = filepath.Base(event.Exe)
+
 			} else {
-				event.Exe = image
-				checksum = image
-				exe = image
+				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
 			}
 
-			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, "", event.Timestamp, exe, checksum)
+			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, "", event.Timestamp, tool)
 			eventHandler.ProcessConnectionMap[cacheKey] = true
 		}
 	}
@@ -113,7 +118,7 @@ func (eventHandler *EventHandler) HandleEvent(event *Event) {
 	case fileMonitorTag:
 		eventHandler.handleFileEvent(event)
 	case processMonitorTag:
-		eventHandler.handleProcessEvent()
+		eventHandler.handleProcessEvent(event)
 	}
 }
 
@@ -158,6 +163,19 @@ func getProgramChecksum(path string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func (eventHandler *EventHandler) GetToolChain(PPid, exe string) *Tool {
+	checksum, _ := getProgramChecksum(exe)
+	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
+
+	parentProcess, found := eventHandler.ProcessMap[PPid]
+	for found {
+		tool.Parent = eventHandler.GetToolChain(parentProcess.PPid, parentProcess.Exe)
+		parentProcess, found = eventHandler.ProcessMap[PPid]
+	}
+
+	return &tool
 }
 
 func isPrivateIPAddress(ipAddress string) bool {

@@ -17,6 +17,7 @@ type DNSRecord struct {
 type Tool struct {
 	Name   string `json:"name"`
 	SHA256 string `json:"sha256"`
+	Parent *Tool  `json:"parent"`
 }
 
 type FileEvent struct {
@@ -59,7 +60,7 @@ func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAdd
 	return apiclient.sendApiRequest("POST", url, dnsRecord)
 }
 
-func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, port, status string, timestamp time.Time, tool, toolChecksum string) error {
+func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, port, status string, timestamp time.Time, tool Tool) error {
 
 	networkConnection := &NetworkConnection{}
 
@@ -67,20 +68,20 @@ func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, po
 	networkConnection.Port = port
 	networkConnection.Status = status
 	networkConnection.TimeStamp = timestamp
-	networkConnection.Tool = Tool{Name: tool, SHA256: toolChecksum}
+	networkConnection.Tool = tool
 
 	url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/networkconnection", apiclient.APIURL, repo, correlationId)
 
 	return apiclient.sendApiRequest("POST", url, networkConnection)
 }
 
-func (apiclient *ApiClient) sendFileEvent(correlationId, repo, fileType string, timestamp time.Time, tool, toolChecksum string) error {
+func (apiclient *ApiClient) sendFileEvent(correlationId, repo, fileType string, timestamp time.Time, tool Tool) error {
 
 	fileEvent := &FileEvent{}
 
 	fileEvent.FileType = fileType
 	fileEvent.TimeStamp = timestamp
-	fileEvent.Tool = Tool{Name: tool, SHA256: toolChecksum}
+	fileEvent.Tool = tool
 
 	url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/fileevent", apiclient.APIURL, repo, correlationId)
 
