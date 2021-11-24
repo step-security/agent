@@ -149,11 +149,9 @@ func getParentProcessId(pid string) (int, error) {
 		return -1, err
 	}
 
-	// First, parse out the image name
 	data := string(dataBytes)
 	binStart := strings.IndexRune(data, '(') + 1
 	binEnd := strings.IndexRune(data[binStart:], ')')
-	p.binary = data[binStart : binStart+binEnd]
 
 	var ppid, pgrp, sid int
 	var state rune
