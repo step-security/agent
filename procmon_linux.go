@@ -139,3 +139,31 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 
 	}
 }
+
+func getParentProcessId(pid string) (int, error) {
+	statPath := fmt.Sprintf("/proc/%s/stat", p.pid)
+	dataBytes, err := ioutil.ReadFile(statPath)
+	if err != nil {
+		return -1, err
+	}
+
+	// First, parse out the image name
+	data := string(dataBytes)
+	binStart := strings.IndexRune(data, '(') + 1
+	binEnd := strings.IndexRune(data[binStart:], ')')
+	p.binary = data[binStart : binStart+binEnd]
+
+	var ppid, pgrp, sid int
+	var state rune
+
+	// Move past the image name and start parsing the rest
+	data = data[binStart+binEnd+2:]
+	_, err = fmt.Sscanf(data,
+		"%c %d %d %d",
+		&state,
+		&ppid,
+		&pgrp,
+		&sid)
+
+	return ppid, err
+}

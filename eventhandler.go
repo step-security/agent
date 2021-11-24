@@ -10,7 +10,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -169,16 +168,12 @@ func getProgramChecksum(path string) (string, error) {
 func (eventHandler *EventHandler) GetToolChain(PPid, exe string) *Tool {
 	checksum, _ := getProgramChecksum(exe)
 	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
-	parentProcess, found := eventHandler.ProcessMap[PPid]
-	if found {
-		tool.Parent = eventHandler.GetToolChain(parentProcess.PPid, parentProcess.Exe)
-	} else {
-		_, err := strconv.Atoi(PPid)
+
+	parentProcessId, err := getParentProcessId(PPid)
+	if err != nil {
+		path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", PPid))
 		if err == nil {
-			path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", PPid))
-			if err == nil {
-				tool.Parent = eventHandler.GetToolChain("", path)
-			}
+			tool.Parent = eventHandler.GetToolChain(fmt.Sprintf("%d", parentProcessId), path)
 		}
 	}
 
