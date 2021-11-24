@@ -175,8 +175,8 @@ func (eventHandler *EventHandler) GetToolChain(PPid, exe string) *Tool {
 	} else {
 		_, err := strconv.Atoi(PPid)
 		if err == nil {
-			path, err := filepath.EvalSymlinks(fmt.Sprintf("/proc/%s/exe", PPid))
-			if err != nil {
+			path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", PPid))
+			if err == nil {
 				tool.Parent = eventHandler.GetToolChain("", path)
 			}
 		}
