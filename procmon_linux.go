@@ -11,6 +11,8 @@ import (
 	"github.com/elastic/go-libaudit/v2/rule"
 	"github.com/elastic/go-libaudit/v2/rule/flags"
 	"github.com/pkg/errors"
+	"io/ioutil"
+	"strings"
 )
 
 func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
@@ -141,7 +143,7 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 }
 
 func getParentProcessId(pid string) (int, error) {
-	statPath := fmt.Sprintf("/proc/%s/stat", p.pid)
+	statPath := fmt.Sprintf("/proc/%s/stat", pid)
 	dataBytes, err := ioutil.ReadFile(statPath)
 	if err != nil {
 		return -1, err
