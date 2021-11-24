@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -171,6 +172,14 @@ func (eventHandler *EventHandler) GetToolChain(PPid, exe string) *Tool {
 	parentProcess, found := eventHandler.ProcessMap[PPid]
 	if found {
 		tool.Parent = eventHandler.GetToolChain(parentProcess.PPid, parentProcess.Exe)
+	} else {
+		_, err := strconv.Atoi(PPid)
+		if err == nil {
+			path, err := filepath.EvalSymlinks(fmt.Sprintf("/proc/%s/exe", PPid))
+			if err != nil {
+				tool.Parent = eventHandler.GetToolChain("", path)
+			}
+		}
 	}
 
 	return &tool
