@@ -11,6 +11,9 @@ import (
 	"github.com/elastic/go-libaudit/v2/rule"
 	"github.com/elastic/go-libaudit/v2/rule/flags"
 	"github.com/pkg/errors"
+	"io/ioutil"
+	"os"
+	"strings"
 )
 
 func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
@@ -138,4 +141,38 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 		}
 
 	}
+}
+
+func getParentProcessId(pid string) (int, error) {
+	statPath := fmt.Sprintf("/proc/%s/stat", pid)
+	dataBytes, err := ioutil.ReadFile(statPath)
+	if err != nil {
+		return -1, err
+	}
+
+	data := string(dataBytes)
+	binStart := strings.IndexRune(data, '(') + 1
+	binEnd := strings.IndexRune(data[binStart:], ')')
+
+	var ppid, pgrp, sid int
+	var state rune
+
+	// Move past the image name and start parsing the rest
+	data = data[binStart+binEnd+2:]
+	_, err = fmt.Sscanf(data,
+		"%c %d %d %d",
+		&state,
+		&ppid,
+		&pgrp,
+		&sid)
+
+	return ppid, err
+}
+
+func getProcessExe(pid string) (string, error) {
+	path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", pid))
+	if err != nil {
+		return "", err
+	}
+	return path, nil
 }

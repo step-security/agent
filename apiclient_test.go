@@ -81,8 +81,7 @@ func Test_sendNetConnection(t *testing.T) {
 		port          string
 		status        string
 		timestamp     time.Time
-		tool          string
-		toolChecksum  string
+		tool          Tool
 	}
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
@@ -102,7 +101,8 @@ func Test_sendNetConnection(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := apiclient.sendNetConnection(tt.args.correlationId, tt.args.repo, tt.args.ipAddress, tt.args.port, tt.args.status, tt.args.timestamp, tt.args.tool, tt.args.toolChecksum); (err != nil) != tt.wantErr {
+			if err := apiclient.sendNetConnection(tt.args.correlationId, tt.args.repo, tt.args.ipAddress,
+				tt.args.port, tt.args.status, tt.args.timestamp, tt.args.tool); (err != nil) != tt.wantErr {
 				t.Errorf("sendNetConnection() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

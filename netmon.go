@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const Unknown = "Unknown"
+
 type NetworkMonitor struct {
 	CorrelationId string
 	Repo          string
@@ -88,7 +90,7 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 
 			if isSYN {
 				netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
-					ipv4.DstIP.String(), port, netMonitor.Status, timestamp, "Unknown", "Unknown")
+					ipv4.DstIP.String(), port, netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
 			}
 		}
 
