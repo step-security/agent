@@ -24,6 +24,7 @@ type ProcessMonitor struct {
 
 type Process struct {
 	PID              string
+	PPid             string
 	Exe              string
 	WorkingDirectory string
 	Arguments        []string
