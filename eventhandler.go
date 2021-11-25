@@ -169,6 +169,15 @@ func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 	checksum, _ := getProgramChecksum(exe)
 	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
 
+	// In some cases the process has already exited, so get from map first
+	parentProcess, found := eventHandler.ProcessMap[ppid]
+
+	if found {
+		tool.Parent = eventHandler.GetToolChain(parentProcess.PPid, parentProcess.Exe)
+		return &tool
+	}
+
+	// If not in map, may be long running, so get from OS
 	parentProcessId, err := getParentProcessId(ppid)
 	if err != nil {
 		return &tool
