@@ -165,17 +165,21 @@ func getProgramChecksum(path string) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-func (eventHandler *EventHandler) GetToolChain(PPid, exe string) *Tool {
+func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 	checksum, _ := getProgramChecksum(exe)
 	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
 
-	parentProcessId, err := getParentProcessId(PPid)
-	if err == nil {
-		path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", PPid))
-		if err == nil {
-			tool.Parent = eventHandler.GetToolChain(fmt.Sprintf("%d", parentProcessId), path)
-		}
+	parentProcessId, err := getParentProcessId(ppid)
+	if err != nil {
+		return &tool
 	}
+
+	path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", ppid))
+	if err != nil {
+		return &tool
+	}
+
+	tool.Parent = eventHandler.GetToolChain(fmt.Sprintf("%d", parentProcessId), path)
 
 	return &tool
 }
