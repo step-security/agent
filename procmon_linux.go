@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/go-libaudit/v2/rule/flags"
 	"github.com/pkg/errors"
 	"io/ioutil"
+	"os"
 	"strings"
 )
 
@@ -166,4 +167,12 @@ func getParentProcessId(pid string) (int, error) {
 		&sid)
 
 	return ppid, err
+}
+
+func getProcessExe(pid string) (string, error) {
+	path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", pid))
+	if err != nil {
+		return "", err
+	}
+	return path, nil
 }

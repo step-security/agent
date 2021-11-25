@@ -183,7 +183,7 @@ func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 		return &tool
 	}
 
-	path, err := os.Readlink(fmt.Sprintf("/proc/%s/exe", ppid))
+	path, err := getProcessExe(ppid)
 	if err != nil {
 		return &tool
 	}
