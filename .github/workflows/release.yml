@@ -11,7 +11,6 @@ jobs:
   release:
     permissions:
       contents: write
-    if: github.event.base_ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
     - uses: step-security/harden-runner@7206db2ec98c5538323a6d70e51f965d55c11c87
