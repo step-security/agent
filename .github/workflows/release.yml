@@ -17,7 +17,7 @@ jobs:
       with:
        allowed-endpoints: 
         api.github.com:443
-        beta.api.stepsecurity.io:443
+        agent.api.stepsecurity.io:443
         github.com:443
         int.api.stepsecurity.io:443
         pipelines.actions.githubusercontent.com:443
