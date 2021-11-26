@@ -30,7 +30,7 @@ jobs:
       uses: actions/setup-go@37335c7bb261b353407cff977110895fa0b4f7d8
       with:
         go-version: 1.17    
-    - uses: goreleaser/goreleaser-action@v2
+    - uses: goreleaser/goreleaser-action@5df302e5e9e4c66310a6b6493a8865b12c555af2
       with:
         distribution: goreleaser
         version: latest
