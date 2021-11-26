@@ -2,15 +2,16 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - '*'
 
 permissions: read-all
 
 jobs:
   release:
     permissions:
-      contents: read
+      contents: write
+    if: github.event.base_ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
     - uses: step-security/harden-runner@7206db2ec98c5538323a6d70e51f965d55c11c87
@@ -43,4 +44,10 @@ jobs:
       uses: docker://ghcr.io/step-security/integration-test/int:latest
       env:
         PAT: ${{ secrets.PAT }}
-    - run: aws s3 cp ./agent s3://step-security-agent/refs/heads/agent/agent --acl public-read
+    - uses: goreleaser/goreleaser-action@v2
+      with:
+        distribution: goreleaser
+        version: latest
+        args: release --rm-dist
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
