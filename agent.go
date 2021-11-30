@@ -92,7 +92,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		writeLog("before audit rules")
 
 		// Add logging to firewall, including NFLOG rules
-		if err := addAuditRules(iptables); err != nil {
+		if err := AddAuditRules(iptables); err != nil {
 			writeLog(fmt.Sprintf("Error adding firewall rules %v", err))
 			return err
 		}
@@ -167,7 +167,11 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		case <-ctx.Done():
 			return nil
 		case e := <-errc:
-			writeLog(e.Error())
+			writeLog(fmt.Sprintf("Error in Initialization %v", e))
+			err := RevertChanges(iptables)
+			if err != nil {
+				writeLog(fmt.Sprintf("Error in RevertChanges %v", err))
+			}
 			return e
 
 		}
