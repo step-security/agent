@@ -19,5 +19,5 @@ jobs:
     - name: Run coverage
       run: sudo go test -race -coverprofile=coverage.txt -covermode=atomic
       env:
-        ci-test: true
+        ci-test: "true"
     - uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b
