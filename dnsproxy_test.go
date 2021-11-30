@@ -11,7 +11,6 @@ import (
 
 func init() {
 	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
 }
 
 func TestDNSProxy_getResponse(t *testing.T) {

@@ -9,11 +9,7 @@ import (
 	"github.com/jarcoal/httpmock"
 )
 
-func init() {
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-}
-
+/*
 func Test_sendDNSRecord(t *testing.T) {
 	type args struct {
 		correlationId string
@@ -24,8 +20,12 @@ func Test_sendDNSRecord(t *testing.T) {
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
 
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/jobs/123/dns", agentApiBaseUrl),
 		httpmock.NewStringResponder(200, ""))
+
 	tests := []struct {
 		name    string
 		args    args
@@ -40,7 +40,7 @@ func Test_sendDNSRecord(t *testing.T) {
 			}
 		})
 	}
-}
+}*/
 
 func Test_sendNetConnection(t *testing.T) {
 	type args struct {
@@ -54,6 +54,9 @@ func Test_sendNetConnection(t *testing.T) {
 	}
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
+
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
 
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/jobs/123/networkconnection", agentApiBaseUrl),
 		httpmock.NewStringResponder(200, ""))
