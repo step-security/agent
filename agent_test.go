@@ -159,7 +159,7 @@ func TestRun(t *testing.T) {
 	ci := os.Getenv("ci-test")
 	fmt.Printf("ci-test: %s", ci)
 	for _, tt := range tests {
-		if !tt.args.ciTestOnly || ci == "true" {
+		if !tt.args.ciTestOnly || ci == "PASS" {
 			t.Run(tt.name, func(t *testing.T) {
 				tempDir := os.TempDir()
 				if err := Run(getContext(tt.args.ctxCancelDuration), tt.args.configFilePath, tt.args.hostDNSServer, tt.args.dockerDNSServer,
@@ -170,7 +170,7 @@ func TestRun(t *testing.T) {
 				deleteTempFile(path.Join(tempDir, "resolved.conf"))
 				deleteTempFile(path.Join(tempDir, "daemon.json"))
 
-				if ci == "true" {
+				if ci == "PASS" {
 					RevertFirewallChanges(nil)
 				}
 			})
