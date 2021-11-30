@@ -107,8 +107,10 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		writeLog("started p monitor")
 	}
 
+	dnsConfig := DnsConfig{}
+
 	// Change DNS config on host, causes processes to use agent's DNS proxy
-	if err := setDNSServer(cmd, resolvdConfigPath); err != nil {
+	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath); err != nil {
 		writeLog(fmt.Sprintf("Error setting DNS server %v", err))
 		return err
 	}
@@ -116,7 +118,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	writeLog("updated resolved")
 
 	// Change DNS for docker, causes process in containers to use agent's DNS proxy
-	if err := setDockerDNSServer(cmd, dockerDaemonConfigPath); err != nil {
+	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath); err != nil {
 		writeLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
 		return err
 	}
@@ -171,6 +173,14 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			err := RevertChanges(iptables)
 			if err != nil {
 				writeLog(fmt.Sprintf("Error in RevertChanges %v", err))
+			}
+			err = dnsConfig.RevertDNSServer(cmd, resolvdConfigPath)
+			if err != nil {
+				writeLog(fmt.Sprintf("Error in reverting DNS server changes %v", err))
+			}
+			err = dnsConfig.RevertDockerDNSServer(cmd, dockerDaemonConfigPath)
+			if err != nil {
+				writeLog(fmt.Sprintf("Error in reverting docker DNS server changes %v", err))
 			}
 			return e
 
