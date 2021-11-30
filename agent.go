@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"time"
@@ -47,7 +46,7 @@ type IPTables interface {
 // TODO: move all inputs into a struct
 func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	dockerDNSServer DNSServer, iptables *Firewall, nflog AgentNflogger,
-	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string, stdout io.Writer) error {
+	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string) error {
 
 	// Passed to each go routine, if anyone fails, the program fails
 	errc := make(chan error)
@@ -157,11 +156,6 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			return err
 		}
 	}
-
-	// Ask API to monitor the run
-	go apiclient.monitorRun(config.Repo, config.RunId)
-
-	writeLog("called monitor run")
 
 	writeLog("done")
 

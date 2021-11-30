@@ -9,39 +9,6 @@ import (
 	"github.com/jarcoal/httpmock"
 )
 
-func Test_monitorRun(t *testing.T) {
-	type args struct {
-		repo  string
-		runid string
-	}
-
-	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
-
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/runs/123/monitor", agentApiBaseUrl),
-		httpmock.NewStringResponder(200, ""))
-
-	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/runs/456/monitor", agentApiBaseUrl),
-		httpmock.NewStringResponder(401, ""))
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{name: "valid request", args: args{repo: "owner/repo", runid: "123"}, wantErr: false},
-		{name: "error case", args: args{repo: "owner/repo", runid: "456"}, wantErr: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := apiclient.monitorRun(tt.args.repo, tt.args.runid); (err != nil) != tt.wantErr {
-				t.Errorf("monitorRun() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func Test_sendDNSRecord(t *testing.T) {
 	type args struct {
 		correlationId string

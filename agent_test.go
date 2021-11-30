@@ -82,7 +82,7 @@ func (m *MockCommandWithError) Run() error {
 	return fmt.Errorf("failed to run command")
 }
 
-func TestRun(t *testing.T) {
+func TestRun1(t *testing.T) {
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -96,7 +96,7 @@ func TestRun(t *testing.T) {
 
 	err := Run(ctx, "./testfiles/agent.json",
 		&mockDNSServer{}, &mockDNSServer{}, &Firewall{&MockIPTables{}},
-		&MockAgentNflogger{}, &MockCommand{}, createTempFileWithContents(""), createTempFileWithContents("{}"), nil)
+		&MockAgentNflogger{}, &MockCommand{}, createTempFileWithContents(""), createTempFileWithContents("{}"))
 
 	if err != nil {
 		fmt.Printf("err: %v\n", err)
@@ -118,7 +118,7 @@ func TestRunWithDNSFailure(t *testing.T) {
 
 	err := Run(ctx, "./testfiles/agent.json",
 		&mockDNSServer{}, &mockDNSServerWithError{}, &Firewall{&MockIPTables{}},
-		&MockAgentNflogger{}, &MockCommand{}, createTempFileWithContents(""), createTempFileWithContents("{}"), nil)
+		&MockAgentNflogger{}, &MockCommand{}, createTempFileWithContents(""), createTempFileWithContents("{}"))
 
 	// if 2 seconds pass
 	if err == nil {
@@ -141,7 +141,7 @@ func TestRunWithCMDFailure(t *testing.T) {
 
 	err := Run(ctx, "./testfiles/agent.json",
 		&mockDNSServer{}, &mockDNSServer{}, &Firewall{&MockIPTables{}},
-		&MockAgentNflogger{}, &MockCommandWithError{}, createTempFileWithContents(""), createTempFileWithContents("{}"), nil)
+		&MockAgentNflogger{}, &MockCommandWithError{}, createTempFileWithContents(""), createTempFileWithContents("{}"))
 
 	// if 2 seconds pass
 	if err == nil {
@@ -174,3 +174,48 @@ func TestRunWithNflogError(t *testing.T) {
 
 }
 */
+
+func getContext(seconds int) context.Context {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	time.AfterFunc(2*time.Second, cancel)
+
+	return ctx
+}
+
+func TestRun(t *testing.T) {
+	type args struct {
+		ctxCancelDuration      int
+		configFilePath         string
+		hostDNSServer          DNSServer
+		dockerDNSServer        DNSServer
+		iptables               *Firewall
+		nflog                  AgentNflogger
+		cmd                    Command
+		resolvdConfigPath      string
+		dockerDaemonConfigPath string
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{name: "success", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
+		{name: "dns failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServerWithError{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+		{name: "cmd failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommandWithError{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := Run(getContext(tt.args.ctxCancelDuration), tt.args.configFilePath, tt.args.hostDNSServer, tt.args.dockerDNSServer, tt.args.iptables, tt.args.nflog, tt.args.cmd, tt.args.resolvdConfigPath, tt.args.dockerDaemonConfigPath); (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

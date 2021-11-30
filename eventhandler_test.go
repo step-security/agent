@@ -3,11 +3,15 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/jarcoal/httpmock"
 )
+
+func init() {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+}
 
 func TestEventHandler_HandleEvent(t *testing.T) {
 	type fields struct {
@@ -17,17 +21,12 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 		ProcessConnectionMap map[string]bool
 		ProcessFileMap       map[string]bool
 		ProcessMap           map[string]*Process
-		netMutex             sync.RWMutex
-		fileMutex            sync.RWMutex
 	}
 	type args struct {
 		event *Event
 	}
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
-
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
 
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/jobs/123/networkconnection", agentApiBaseUrl),
 		httpmock.NewStringResponder(200, ""))
@@ -56,8 +55,6 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 				ProcessConnectionMap: tt.fields.ProcessConnectionMap,
 				ProcessFileMap:       tt.fields.ProcessFileMap,
 				ProcessMap:           tt.fields.ProcessMap,
-				netMutex:             tt.fields.netMutex,
-				fileMutex:            tt.fields.fileMutex,
 			}
 			eventHandler.HandleEvent(tt.args.event)
 		})
