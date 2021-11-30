@@ -157,7 +157,7 @@ func TestRun(t *testing.T) {
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
 	}
 	ci := os.Getenv("CI")
-	fmt.Printf("ci: %s\n", ci)
+	fmt.Printf("ci: %s", os.Getenv("CI"))
 	for _, tt := range tests {
 		if !tt.args.ciTestOnly || ci == "true" {
 			t.Run(tt.name, func(t *testing.T) {
