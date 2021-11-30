@@ -46,7 +46,7 @@ type IPTables interface {
 // TODO: move all inputs into a struct
 func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	dockerDNSServer DNSServer, iptables *Firewall, nflog AgentNflogger,
-	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string) error {
+	cmd Command, resolvdConfigPath, dockerDaemonConfigPath, tempDir string) error {
 
 	// Passed to each go routine, if anyone fails, the program fails
 	errc := make(chan error)
@@ -110,7 +110,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	dnsConfig := DnsConfig{}
 
 	// Change DNS config on host, causes processes to use agent's DNS proxy
-	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath); err != nil {
+	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath, tempDir); err != nil {
 		writeLog(fmt.Sprintf("Error setting DNS server %v", err))
 		return err
 	}
@@ -118,7 +118,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	writeLog("updated resolved")
 
 	// Change DNS for docker, causes process in containers to use agent's DNS proxy
-	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath); err != nil {
+	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
 		writeLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
 		return err
 	}

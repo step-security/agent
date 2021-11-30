@@ -85,7 +85,7 @@ func writeResolveConfig(configPath string) error {
 	return nil
 }
 
-func (d *DnsConfig) SetDNSServer(cmd Command, resolvdConfigPath string) error {
+func (d *DnsConfig) SetDNSServer(cmd Command, resolvdConfigPath, tempDir string) error {
 	mock := cmd != nil
 	if !mock {
 		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl stop systemd-resolved")
@@ -96,7 +96,7 @@ func (d *DnsConfig) SetDNSServer(cmd Command, resolvdConfigPath string) error {
 		return fmt.Errorf(fmt.Sprintf("error stopping systemd-resolved: %v", err))
 	}
 
-	d.ResolveConfigBackUpPath = path.Join(os.TempDir(), "resolved.conf")
+	d.ResolveConfigBackUpPath = path.Join(tempDir, "resolved.conf")
 	err = copy(resolvdConfigPath, d.ResolveConfigBackUpPath)
 
 	if err != nil {
@@ -142,9 +142,9 @@ func copy(src, dst string) error {
 	return nil
 }
 
-func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath string) error {
-	d.DockerConfigBackUpPath = path.Join(os.TempDir(), "daemon.json")
-	err := copy(configPath, d.ResolveConfigBackUpPath)
+func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) error {
+	d.DockerConfigBackUpPath = path.Join(tempDir, "daemon.json")
+	err := copy(configPath, d.DockerConfigBackUpPath)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("error backing up docker config: %v", err))
 	}

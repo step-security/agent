@@ -46,7 +46,7 @@ func main() {
 	}()
 
 	if err := Run(ctx, agentConfigFilePath, &dns.Server{Addr: "127.0.0.1:53", Net: "udp"},
-		&dns.Server{Addr: "172.17.0.1:53", Net: "udp"}, nil, nil, nil, resolvedConfigPath, dockerDaemonConfigPath); err != nil {
+		&dns.Server{Addr: "172.17.0.1:53", Net: "udp"}, nil, nil, nil, resolvedConfigPath, dockerDaemonConfigPath, os.TempDir()); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
