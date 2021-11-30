@@ -142,8 +142,8 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 		// Start network monitor
 		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
-
-		for _, endpoint := range config.Endpoints {
+		endpoints := addImplicitEndpoints(config.Endpoints)
+		for _, endpoint := range endpoints {
 			// this will cause domain, IP mapping to be cached
 			ipAddress, err := dnsProxy.getIPByDomain(endpoint.domainName)
 			if err != nil {
@@ -179,6 +179,18 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 		}
 	}
+}
+
+func addImplicitEndpoints(endpoints []Endpoint) []Endpoint {
+	implicitEndpoints := []Endpoint{
+		{domainName: "agent.api.stepsecurity.io", port: 443},               // Should be implicit based on user feedback
+		{domainName: "pipelines.actions.githubusercontent.com", port: 443}, // GitHub
+		{domainName: "codeload.github.com", port: 443},                     // GitHub
+		{domainName: "token.actions.githubusercontent.com", port: 443},     // GitHub
+		{domainName: "vstoken.actions.githubusercontent.com", port: 443},   // GitHub
+	}
+
+	return append(endpoints, implicitEndpoints...)
 }
 
 func RevertChanges(iptables *Firewall, nflog AgentNflogger,
