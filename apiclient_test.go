@@ -1,14 +1,5 @@
 package main
 
-import (
-	"fmt"
-	"net/http"
-	"testing"
-	"time"
-
-	"github.com/jarcoal/httpmock"
-)
-
 /*
 func Test_sendDNSRecord(t *testing.T) {
 	type args struct {
@@ -41,7 +32,7 @@ func Test_sendDNSRecord(t *testing.T) {
 		})
 	}
 }*/
-
+/*
 func Test_sendNetConnection(t *testing.T) {
 	type args struct {
 		correlationId string
@@ -77,3 +68,4 @@ func Test_sendNetConnection(t *testing.T) {
 		})
 	}
 }
+*/
