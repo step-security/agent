@@ -78,6 +78,32 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	go startDNSServer(dnsProxy, hostDNSServer, errc)
 	go startDNSServer(dnsProxy, dockerDNSServer, errc) // this is for the docker bridge
 
+	if cmd == nil {
+		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo, ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory}
+		go procMon.MonitorProcesses(errc)
+		writeLog("started p monitor")
+	}
+
+	dnsConfig := DnsConfig{}
+
+	// Change DNS config on host, causes processes to use agent's DNS proxy
+	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath, tempDir); err != nil {
+		writeLog(fmt.Sprintf("Error setting DNS server %v", err))
+		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+		return err
+	}
+
+	writeLog("updated resolved")
+
+	// Change DNS for docker, causes process in containers to use agent's DNS proxy
+	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
+		writeLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
+		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+		return err
+	}
+
+	writeLog("set docker config")
+
 	if len(config.Endpoints) == 0 {
 		netMonitor := NetworkMonitor{
 			CorrelationId: config.CorrelationId,
@@ -94,36 +120,12 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		// Add logging to firewall, including NFLOG rules
 		if err := AddAuditRules(iptables); err != nil {
 			writeLog(fmt.Sprintf("Error adding firewall rules %v", err))
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 			return err
 		}
 
 		writeLog("added audit rules")
 	}
-
-	// TODO: If something did not work, revert settings
-	if cmd == nil {
-		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo, ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory}
-		go procMon.MonitorProcesses(errc)
-		writeLog("started p monitor")
-	}
-
-	dnsConfig := DnsConfig{}
-
-	// Change DNS config on host, causes processes to use agent's DNS proxy
-	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath, tempDir); err != nil {
-		writeLog(fmt.Sprintf("Error setting DNS server %v", err))
-		return err
-	}
-
-	writeLog("updated resolved")
-
-	// Change DNS for docker, causes process in containers to use agent's DNS proxy
-	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
-		writeLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
-		return err
-	}
-
-	writeLog("set docker config")
 
 	// If allowed endpoints set, resolve them, and add to firewall
 	if len(config.Endpoints) > 0 {
@@ -146,6 +148,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			ipAddress, err := dnsProxy.getIPByDomain(endpoint.domainName)
 			if err != nil {
 				writeLog(fmt.Sprintf("Error resolving allowed domain %v", err))
+				RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 				return err
 			}
 
@@ -155,6 +158,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 		if err := addBlockRulesForGitHubHostedRunner(ipAddressEndpoints); err != nil {
 			writeLog(fmt.Sprintf("Error setting firewall for allowed domains %v", err))
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 			return err
 		}
 	}
@@ -170,22 +174,28 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			return nil
 		case e := <-errc:
 			writeLog(fmt.Sprintf("Error in Initialization %v", e))
-			err := RevertChanges(iptables)
-			if err != nil {
-				writeLog(fmt.Sprintf("Error in RevertChanges %v", err))
-			}
-			err = dnsConfig.RevertDNSServer(cmd, resolvdConfigPath)
-			if err != nil {
-				writeLog(fmt.Sprintf("Error in reverting DNS server changes %v", err))
-			}
-			err = dnsConfig.RevertDockerDNSServer(cmd, dockerDaemonConfigPath)
-			if err != nil {
-				writeLog(fmt.Sprintf("Error in reverting docker DNS server changes %v", err))
-			}
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 			return e
 
 		}
 	}
+}
+
+func RevertChanges(iptables *Firewall, nflog AgentNflogger,
+	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string, dnsConfig DnsConfig) {
+	err := RevertFirewallChanges(iptables)
+	if err != nil {
+		writeLog(fmt.Sprintf("Error in RevertChanges %v", err))
+	}
+	err = dnsConfig.RevertDNSServer(cmd, resolvdConfigPath)
+	if err != nil {
+		writeLog(fmt.Sprintf("Error in reverting DNS server changes %v", err))
+	}
+	err = dnsConfig.RevertDockerDNSServer(cmd, dockerDaemonConfigPath)
+	if err != nil {
+		writeLog(fmt.Sprintf("Error in reverting docker DNS server changes %v", err))
+	}
+	writeLog("Reverted changes")
 }
 
 func writeLog(message string) {

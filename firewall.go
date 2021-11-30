@@ -199,7 +199,7 @@ func AddAuditRules(firewall *Firewall) error {
 	return nil
 }
 
-func RevertChanges(firewall *Firewall) error {
+func RevertFirewallChanges(firewall *Firewall) error {
 	var ipt IPTables
 	var err error
 	if firewall == nil {

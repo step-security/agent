@@ -131,6 +131,7 @@ func TestRun(t *testing.T) {
 		cmd                    Command
 		resolvdConfigPath      string
 		dockerDaemonConfigPath string
+		ciTestOnly             bool
 	}
 
 	tests := []struct {
@@ -141,6 +142,10 @@ func TestRun(t *testing.T) {
 		{name: "success", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
+		{name: "success allowed endpoints", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent-allowed-endpoints.json",
+			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: nil, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
 		{name: "dns failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServerWithError{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
@@ -151,17 +156,23 @@ func TestRun(t *testing.T) {
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNfloggerWithErr{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
 	}
+	ci := os.Getenv("CI")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tempDir := os.TempDir()
-			if err := Run(getContext(tt.args.ctxCancelDuration), tt.args.configFilePath, tt.args.hostDNSServer, tt.args.dockerDNSServer,
-				tt.args.iptables, tt.args.nflog, tt.args.cmd, tt.args.resolvdConfigPath, tt.args.dockerDaemonConfigPath, tempDir); (err != nil) != tt.wantErr {
-				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
-			}
+		if !tt.args.ciTestOnly || ci == "true" {
+			t.Run(tt.name, func(t *testing.T) {
+				tempDir := os.TempDir()
+				if err := Run(getContext(tt.args.ctxCancelDuration), tt.args.configFilePath, tt.args.hostDNSServer, tt.args.dockerDNSServer,
+					tt.args.iptables, tt.args.nflog, tt.args.cmd, tt.args.resolvdConfigPath, tt.args.dockerDaemonConfigPath, tempDir); (err != nil) != tt.wantErr {
+					t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
+				}
 
-			deleteTempFile(path.Join(tempDir, "resolved.conf"))
-			deleteTempFile(path.Join(tempDir, "daemon.json"))
+				deleteTempFile(path.Join(tempDir, "resolved.conf"))
+				deleteTempFile(path.Join(tempDir, "daemon.json"))
 
-		})
+				if ci == "true"{
+					RevertFirewallChanges(nil)
+				}
+			})
+		}
 	}
 }
