@@ -157,6 +157,7 @@ func TestRun(t *testing.T) {
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
 	}
 	ci := os.Getenv("CI")
+	fmt.Printf("ci: %s\n", ci)
 	for _, tt := range tests {
 		if !tt.args.ciTestOnly || ci == "true" {
 			t.Run(tt.name, func(t *testing.T) {
@@ -169,7 +170,7 @@ func TestRun(t *testing.T) {
 				deleteTempFile(path.Join(tempDir, "resolved.conf"))
 				deleteTempFile(path.Join(tempDir, "daemon.json"))
 
-				if ci == "true"{
+				if ci == "true" {
 					RevertFirewallChanges(nil)
 				}
 			})
