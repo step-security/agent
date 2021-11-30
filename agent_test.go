@@ -170,7 +170,7 @@ func TestRun(t *testing.T) {
 				deleteTempFile(path.Join(tempDir, "resolved.conf"))
 				deleteTempFile(path.Join(tempDir, "daemon.json"))
 
-				if ciTest {
+				if tt.args.ciTestOnly {
 					fmt.Printf("Reverting firewall changes")
 					RevertFirewallChanges(nil)
 				}
