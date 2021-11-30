@@ -156,8 +156,8 @@ func TestRun(t *testing.T) {
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNfloggerWithErr{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
 	}
-	_, ciTest := os.LookupEnv("ci-test")
-	fmt.Printf("ci-test: %t", ciTest)
+	_, ciTest := os.LookupEnv("CI")
+	fmt.Printf("ci-test: %t\n", ciTest)
 	for _, tt := range tests {
 		if !tt.args.ciTestOnly || ciTest {
 			t.Run(tt.name, func(t *testing.T) {
