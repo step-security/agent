@@ -156,10 +156,10 @@ func TestRun(t *testing.T) {
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNfloggerWithErr{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
 	}
-	ci := os.Getenv("ci-test")
-	fmt.Printf("ci-test: %s", ci)
+	_, ciTest := os.LookupEnv("ci-test")
+	fmt.Printf("ci-test: %t", ciTest)
 	for _, tt := range tests {
-		if !tt.args.ciTestOnly || ci == "PASS" {
+		if !tt.args.ciTestOnly || ciTest {
 			t.Run(tt.name, func(t *testing.T) {
 				tempDir := os.TempDir()
 				if err := Run(getContext(tt.args.ctxCancelDuration), tt.args.configFilePath, tt.args.hostDNSServer, tt.args.dockerDNSServer,
@@ -170,7 +170,7 @@ func TestRun(t *testing.T) {
 				deleteTempFile(path.Join(tempDir, "resolved.conf"))
 				deleteTempFile(path.Join(tempDir, "daemon.json"))
 
-				if ci == "PASS" {
+				if ciTest {
 					fmt.Printf("Reverting firewall changes")
 					RevertFirewallChanges(nil)
 				}
