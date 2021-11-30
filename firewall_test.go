@@ -10,7 +10,7 @@ import (
 )
 
 func Test_addAuditRules(t *testing.T) {
-	err := addAuditRules(nil)
+	err := AddAuditRules(nil)
 	if err != nil {
 		t.Errorf("Error not expected %v", err)
 	}

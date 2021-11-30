@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/florianl/go-nflog/v2"
-	"github.com/jarcoal/httpmock"
 )
 
 type mockDNSServer struct {
@@ -82,74 +83,6 @@ func (m *MockCommandWithError) Run() error {
 	return fmt.Errorf("failed to run command")
 }
 
-func TestRun(t *testing.T) {
-
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	time.AfterFunc(2*time.Second, cancel)
-
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/owner/repo/actions/runs/1287185438/monitor", agentApiBaseUrl),
-		httpmock.NewStringResponder(200, ""))
-
-	err := Run(ctx, "./testfiles/agent.json",
-		&mockDNSServer{}, &mockDNSServer{}, &Firewall{&MockIPTables{}},
-		&MockAgentNflogger{}, &MockCommand{}, createTempFileWithContents(""), createTempFileWithContents("{}"), nil)
-
-	if err != nil {
-		fmt.Printf("err: %v\n", err)
-		t.Fail()
-	}
-}
-
-func TestRunWithDNSFailure(t *testing.T) {
-
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	time.AfterFunc(5*time.Second, cancel) // this should not be used, it should error out earlier
-
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/owner/repo/actions/runs/1287185438/monitor", agentApiBaseUrl),
-		httpmock.NewStringResponder(200, ""))
-
-	err := Run(ctx, "./testfiles/agent.json",
-		&mockDNSServer{}, &mockDNSServerWithError{}, &Firewall{&MockIPTables{}},
-		&MockAgentNflogger{}, &MockCommand{}, createTempFileWithContents(""), createTempFileWithContents("{}"), nil)
-
-	// if 2 seconds pass
-	if err == nil {
-		t.Fail()
-	}
-
-}
-
-func TestRunWithCMDFailure(t *testing.T) {
-
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	time.AfterFunc(5*time.Second, cancel) // this should not be used, it should error out earlier
-
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/owner/repo/actions/runs/1287185438/monitor", agentApiBaseUrl),
-		httpmock.NewStringResponder(200, ""))
-
-	err := Run(ctx, "./testfiles/agent.json",
-		&mockDNSServer{}, &mockDNSServer{}, &Firewall{&MockIPTables{}},
-		&MockAgentNflogger{}, &MockCommandWithError{}, createTempFileWithContents(""), createTempFileWithContents("{}"), nil)
-
-	// if 2 seconds pass
-	if err == nil {
-		t.Fail()
-	}
-
-}
-
 /*
 func TestRunWithNflogError(t *testing.T) {
 
@@ -174,3 +107,77 @@ func TestRunWithNflogError(t *testing.T) {
 
 }
 */
+
+func deleteTempFile(path string) {
+	os.Remove(path)
+}
+
+func getContext(seconds int) context.Context {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	time.AfterFunc(2*time.Second, cancel)
+
+	return ctx
+}
+
+func TestRun(t *testing.T) {
+	type args struct {
+		ctxCancelDuration      int
+		configFilePath         string
+		hostDNSServer          DNSServer
+		dockerDNSServer        DNSServer
+		iptables               *Firewall
+		nflog                  AgentNflogger
+		cmd                    Command
+		resolvdConfigPath      string
+		dockerDaemonConfigPath string
+		ciTestOnly             bool
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{name: "success", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
+		{name: "success monitor process", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: nil, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
+		{name: "success allowed endpoints", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent-allowed-endpoints.json",
+			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: nil, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
+		{name: "dns failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServerWithError{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+		{name: "cmd failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommandWithError{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+		{name: "nflog failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNfloggerWithErr{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+	}
+	_, ciTest := os.LookupEnv("CI")
+	fmt.Printf("ci-test: %t\n", ciTest)
+	for _, tt := range tests {
+		if !tt.args.ciTestOnly || ciTest {
+			t.Run(tt.name, func(t *testing.T) {
+				tempDir := os.TempDir()
+				if err := Run(getContext(tt.args.ctxCancelDuration), tt.args.configFilePath, tt.args.hostDNSServer, tt.args.dockerDNSServer,
+					tt.args.iptables, tt.args.nflog, tt.args.cmd, tt.args.resolvdConfigPath, tt.args.dockerDaemonConfigPath, tempDir); (err != nil) != tt.wantErr {
+					t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
+				}
+
+				deleteTempFile(path.Join(tempDir, "resolved.conf"))
+				deleteTempFile(path.Join(tempDir, "daemon.json"))
+
+				if tt.args.ciTestOnly {
+					fmt.Printf("Reverting firewall changes\n")
+					RevertFirewallChanges(nil)
+				}
+			})
+		}
+	}
+}

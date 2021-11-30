@@ -41,12 +41,6 @@ type ApiClient struct {
 
 const agentApiBaseUrl = "https://apiurl/v1"
 
-func (apiclient *ApiClient) monitorRun(repo, runid string) error {
-	url := fmt.Sprintf("%s/github/%s/actions/runs/%s/monitor", apiclient.APIURL, repo, runid)
-
-	return apiclient.sendApiRequest("POST", url, nil)
-}
-
 func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAddress string) error {
 
 	dnsRecord := &DNSRecord{}
