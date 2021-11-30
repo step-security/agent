@@ -18,7 +18,7 @@ jobs:
       security-events: write
 
     steps:
-      - uses: step-security/harden-runner@7206db2ec98c5538323a6d70e51f965d55c11c87
+      - uses: step-security/harden-runner@917f7d59f22e82a5ddcaef409923426fd7aa6327
       - name: "Checkout code"
         uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
 

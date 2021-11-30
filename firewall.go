@@ -149,7 +149,7 @@ func addBlockRules(endpoints []ipAddressEndpoint, chain, netInterface, direction
 	return nil
 }
 
-func addAuditRules(firewall *Firewall) error {
+func AddAuditRules(firewall *Firewall) error {
 	var ipt IPTables
 	var err error
 	if firewall == nil {
@@ -195,6 +195,26 @@ func addAuditRules(firewall *Firewall) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Append failed for FORWARD: %v", err))
 	}
+
+	return nil
+}
+
+func RevertFirewallChanges(firewall *Firewall) error {
+	var ipt IPTables
+	var err error
+	if firewall == nil {
+
+		ipt, err = iptables.New()
+
+		if err != nil {
+			return errors.Wrap(err, "new iptables failed")
+		}
+	} else {
+		ipt = firewall.IPTables
+	}
+
+	ipt.ClearChain("filter", "OUTPUT")
+	ipt.ClearChain("filter", "DOCKER-USER")
 
 	return nil
 }

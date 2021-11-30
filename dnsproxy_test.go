@@ -9,6 +9,10 @@ import (
 	"github.com/miekg/dns"
 )
 
+func init() {
+	httpmock.Activate()
+}
+
 func TestDNSProxy_getResponse(t *testing.T) {
 	type fields struct {
 		Cache *Cache
@@ -21,9 +25,6 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	rrDnsTest, _ := dns.NewRR("test.com. IN A 67.225.146.248")
 
 	apiclient := &ApiClient{Client: &http.Client{}}
-
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
 
 	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=test.com.&type=a",
 		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"test.com.","type":1}],"Answer":[{"name":"test.com.","type":1,"TTL":3080,"data":"67.225.146.248"}]}`))
