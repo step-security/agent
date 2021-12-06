@@ -16,6 +16,7 @@ type config struct {
 	WorkingDirectory string
 	APIURL           string
 	Endpoints        []Endpoint
+	EgressPolicy     string
 }
 
 type Endpoint struct {
@@ -30,6 +31,7 @@ type configFile struct {
 	WorkingDirectory string `json:"working_directory"`
 	APIURL           string `json:"api_url"`
 	AllowedEndpoints string `json:"allowed_endpoints"`
+	EgressPolicy     string `json:"egress_policy"`
 }
 
 // init reads the config file for the agent and initializes config settings
@@ -51,6 +53,7 @@ func (c *config) init(configFilePath string) error {
 	c.WorkingDirectory = configFile.WorkingDirectory
 	c.APIURL = configFile.APIURL
 	c.Endpoints = parseEndpoints(configFile.AllowedEndpoints)
+	c.EgressPolicy = configFile.EgressPolicy
 	return nil
 }
 
