@@ -10,7 +10,11 @@ import (
 	"github.com/florianl/go-nflog/v2"
 )
 
-const StepSecurityLogCorrelationPrefix = "Step Security Job Correlation ID:"
+const (
+	StepSecurityLogCorrelationPrefix = "Step Security Job Correlation ID:"
+	EgressPolicyAudit                = "audit"
+	EgressPolicyBlock                = "block"
+)
 
 type DNSServer interface {
 	ListenAndServe() error
@@ -104,7 +108,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	writeLog("set docker config")
 
-	if len(config.Endpoints) == 0 {
+	if config.EgressPolicy == EgressPolicyAudit {
 		netMonitor := NetworkMonitor{
 			CorrelationId: config.CorrelationId,
 			Repo:          config.Repo,
@@ -125,10 +129,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		}
 
 		writeLog("added audit rules")
-	}
-
-	// If allowed endpoints set, resolve them, and add to firewall
-	if len(config.Endpoints) > 0 {
+	} else if config.EgressPolicy == EgressPolicyBlock {
 		var ipAddressEndpoints []ipAddressEndpoint
 
 		writeLog(fmt.Sprintf("Allowed domains:%v", config.Endpoints))
