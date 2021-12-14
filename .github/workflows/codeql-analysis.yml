@@ -38,6 +38,8 @@ jobs:
 
     steps:
     - uses: step-security/harden-runner@v1
+      with:
+        egress-policy: audit
     - name: Checkout repository
       uses: actions/checkout@629c2de402a417ea7690ca6ce3f33229e27606a5
 
