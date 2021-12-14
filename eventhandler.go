@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -157,7 +157,7 @@ func getProgramChecksum(path string) (string, error) {
 	}
 	defer f.Close()
 
-	h := sha1.New()
+	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return err.Error(), err
 	}
