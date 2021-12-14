@@ -13,10 +13,9 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-    - uses: step-security/harden-runner@917f7d59f22e82a5ddcaef409923426fd7aa6327
+    - uses: step-security/harden-runner@v1
       with:
         allowed-endpoints: 
-          agent.api.stepsecurity.io:443
           api.github.com:443
           github.com:443
           goreleaser.com:443
