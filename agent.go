@@ -82,8 +82,6 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		ApiClient:     apiclient,
 	}
 
-	dnsConfig := DnsConfig{}
-
 	go startDNSServer(dnsProxy, hostDNSServer, errc)
 	go startDNSServer(dnsProxy, dockerDNSServer, errc) // this is for the docker bridge
 
@@ -92,6 +90,26 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		go procMon.MonitorProcesses(errc)
 		writeLog("started p monitor")
 	}
+
+	dnsConfig := DnsConfig{}
+
+	// Change DNS config on host, causes processes to use agent's DNS proxy
+	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath, tempDir); err != nil {
+		writeLog(fmt.Sprintf("Error setting DNS server %v", err))
+		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+		return err
+	}
+
+	writeLog("updated resolved")
+
+	// Change DNS for docker, causes process in containers to use agent's DNS proxy
+	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
+		writeLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
+		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+		return err
+	}
+
+	writeLog("set docker config")
 
 	if config.EgressPolicy == EgressPolicyAudit {
 		netMonitor := NetworkMonitor{
@@ -149,23 +167,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		}
 	}
 
-	// Change DNS config on host, causes processes to use agent's DNS proxy
-	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath, tempDir); err != nil {
-		writeLog(fmt.Sprintf("Error setting DNS server %v", err))
-		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
-		return err
-	}
-
-	writeLog("updated resolved")
-
-	// Change DNS for docker, causes process in containers to use agent's DNS proxy
-	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
-		writeLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
-		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
-		return err
-	}
-
-	writeLog("set docker config")
+	writeLog("done")
 
 	// Write the status file
 	writeStatus("Initialized")
