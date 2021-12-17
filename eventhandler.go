@@ -170,7 +170,9 @@ func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
 
 	// In some cases the process has already exited, so get from map first
+	eventHandler.procMutex.Lock()
 	parentProcess, found := eventHandler.ProcessMap[ppid]
+	eventHandler.procMutex.Unlock()
 
 	if found {
 		tool.Parent = eventHandler.GetToolChain(parentProcess.PPid, parentProcess.Exe)
