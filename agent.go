@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/florianl/go-nflog/v2"
@@ -45,6 +46,8 @@ type IPTables interface {
 	Append(table, chain string, rulespec ...string) error
 	ClearChain(table, chain string) error
 }
+
+var fileMutex sync.Mutex
 
 // Run the agent
 // TODO: move all inputs into a struct
@@ -212,6 +215,9 @@ func RevertChanges(iptables *Firewall, nflog AgentNflogger,
 }
 
 func writeLog(message string) {
+	fileMutex.Lock()
+	defer fileMutex.Unlock()
+
 	f, _ := os.OpenFile("/home/agent/agent.log",
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 

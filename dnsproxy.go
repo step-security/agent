@@ -108,6 +108,8 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		if answer.Type == 1 {
 			proxy.Cache.Set(domain, answer.Data)
 
+			go writeLog(fmt.Sprintf("domain resolved: %s, ip address: %s", domain, answer.Data))
+
 			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data)
 
 			return answer.Data, nil
