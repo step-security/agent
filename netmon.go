@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/florianl/go-nflog/v2"
@@ -17,6 +18,7 @@ type NetworkMonitor struct {
 	Repo          string
 	ApiClient     *ApiClient
 	Status        string
+	netMutex      sync.RWMutex
 }
 
 var ipAddresses = make(map[string]int)
@@ -84,6 +86,7 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 	if ipv4Layer := packet.Layer(layers.LayerTypeIPv4); ipv4Layer != nil {
 		// Get actual TCP data from this layer
 		ipv4, _ := ipv4Layer.(*layers.IPv4)
+		netMonitor.netMutex.Lock()
 		_, found := ipAddresses[ipv4.DstIP.String()]
 		if !found {
 			ipAddresses[ipv4.DstIP.String()] = 1
@@ -93,7 +96,7 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 					ipv4.DstIP.String(), port, netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
 			}
 		}
-
+		netMonitor.netMutex.Unlock()
 	}
 
 }
