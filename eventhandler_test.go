@@ -8,11 +8,6 @@ import (
 	"github.com/jarcoal/httpmock"
 )
 
-func init() {
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-}
-
 func TestEventHandler_HandleEvent(t *testing.T) {
 	type fields struct {
 		CorrelationId        string
