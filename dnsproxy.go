@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
@@ -103,7 +102,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	}
 
 	url := fmt.Sprintf("https://dns.google/resolve?name=%s&type=a", domain)
-	resp, err := http.Get(url)
+	resp, err := proxy.ApiClient.Client.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("error in response from dns.google %v", err)
 	}

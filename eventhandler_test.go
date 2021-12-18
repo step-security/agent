@@ -28,6 +28,8 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
 
+	httpmock.ActivateNonDefault(apiclient.Client)
+
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/jobs/123/networkconnection", agentApiBaseUrl),
 		httpmock.NewStringResponder(200, ""))
 

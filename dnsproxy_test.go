@@ -11,7 +11,7 @@ import (
 
 func init() {
 	httpmock.Activate()
-	//defer httpmock.DeactivateAndReset()
+	defer httpmock.DeactivateAndReset()
 }
 
 func TestDNSProxy_getResponse(t *testing.T) {
@@ -26,8 +26,11 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	Cache := InitCache(60 * 1000000000)
 	rrDnsGoogle, _ := dns.NewRR("dns.google. IN A 8.8.8.8")
 	rrDnsTest, _ := dns.NewRR("test.com. IN A 67.225.146.248")
+	rrDnsAllowed, _ := dns.NewRR("allowed.com. IN A 67.225.146.248")
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
+
+	httpmock.ActivateNonDefault(apiclient.Client)
 
 	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=test.com.&type=a",
 		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"test.com.","type":1}],"Answer":[{"name":"test.com.","type":1,"TTL":3080,"data":"67.225.146.248"}]}`))
@@ -70,6 +73,12 @@ func TestDNSProxy_getResponse(t *testing.T) {
 			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "test.com"}}},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "test.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsTest}},
+			wantErr: false,
+		},
+		{name: "type A allowed.com egress policy",
+			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "allowed.com"}}},
+			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "allowed.com.", Qtype: dns.TypeA}}}},
+			want:    &dns.Msg{Answer: []dns.RR{rrDnsAllowed}},
 			wantErr: false,
 		},
 	}
