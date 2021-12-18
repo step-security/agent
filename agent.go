@@ -92,19 +92,22 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	}
 
 	dnsConfig := DnsConfig{}
-	var ipAddressEndpoints []ipAddressEndpoint
-	endpoints := addImplicitEndpoints(config.Endpoints)
-	for _, endpoint := range endpoints {
-		// this will cause domain, IP mapping to be cached
-		ipAddress, err := dnsProxy.getIPByDomain(endpoint.domainName)
-		if err != nil {
-			writeLog(fmt.Sprintf("Error resolving allowed domain %v", err))
-			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
-			return err
-		}
 
-		// create list of ip address to be added to firewall
-		ipAddressEndpoints = append(ipAddressEndpoints, ipAddressEndpoint{ipAddress: ipAddress, port: fmt.Sprintf("%d", endpoint.port)})
+	var ipAddressEndpoints []ipAddressEndpoint
+	if config.EgressPolicy == EgressPolicyBlock {
+		endpoints := addImplicitEndpoints(config.Endpoints)
+		for _, endpoint := range endpoints {
+			// this will cause domain, IP mapping to be cached
+			ipAddress, err := dnsProxy.getIPByDomain(endpoint.domainName)
+			if err != nil {
+				writeLog(fmt.Sprintf("Error resolving allowed domain %v", err))
+				RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+				return err
+			}
+
+			// create list of ip address to be added to firewall
+			ipAddressEndpoints = append(ipAddressEndpoints, ipAddressEndpoint{ipAddress: ipAddress, port: fmt.Sprintf("%d", endpoint.port)})
+		}
 	}
 
 	// Change DNS config on host, causes processes to use agent's DNS proxy
