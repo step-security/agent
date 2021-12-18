@@ -11,10 +11,12 @@ import (
 )
 
 type DNSProxy struct {
-	Cache         *Cache
-	CorrelationId string
-	Repo          string
-	ApiClient     *ApiClient
+	Cache            *Cache
+	CorrelationId    string
+	Repo             string
+	ApiClient        *ApiClient
+	EgressPolicy     string
+	AllowedEndpoints []Endpoint
 }
 
 type DNSResponse struct {
@@ -75,6 +77,16 @@ func (proxy *DNSProxy) processOtherTypes(q *dns.Question, requestMsg *dns.Msg) (
 	return nil, fmt.Errorf("not found")
 }
 
+func (proxy *DNSProxy) isAllowedDomain(domain string) bool {
+	for _, endpoint := range proxy.AllowedEndpoints {
+		if dns.Fqdn(endpoint.domainName) == dns.Fqdn(domain) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	domain = dns.Fqdn(domain)
 	cacheMsg, found := proxy.Cache.Get(domain)
@@ -83,7 +95,15 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		return cacheMsg.(string), nil
 	}
 
-	resp, err := http.Get(fmt.Sprintf("https://dns.google/resolve?name=%s&type=a", domain))
+	if proxy.EgressPolicy == EgressPolicyBlock {
+		if !proxy.isAllowedDomain(domain) {
+			go writeLog(fmt.Sprintf("domain not allowed: %s", domain))
+			return "", fmt.Errorf("domain not allowed %s", domain)
+		}
+	}
+
+	url := fmt.Sprintf("https://dns.google/resolve?name=%s&type=a", domain)
+	resp, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("error in response from dns.google %v", err)
 	}
