@@ -80,6 +80,8 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		CorrelationId: config.CorrelationId,
 		Repo:          config.Repo,
 		ApiClient:     apiclient,
+		EgressPolicy: config.EgressPolicy,
+		AllowedEndpoints: config.Endpoints,
 	}
 
 	go startDNSServer(dnsProxy, hostDNSServer, errc)
