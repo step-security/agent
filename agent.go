@@ -73,13 +73,15 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	// TODO: fix the cache and time
 	Cache := InitCache(10 * 60 * 1000000000) // 10 * 60 seconds
-
+	allowedEndpoints := addImplicitEndpoints(config.Endpoints)
 	// Start DNS servers and get confirmation
 	dnsProxy := DNSProxy{
-		Cache:         &Cache,
-		CorrelationId: config.CorrelationId,
-		Repo:          config.Repo,
-		ApiClient:     apiclient,
+		Cache:            &Cache,
+		CorrelationId:    config.CorrelationId,
+		Repo:             config.Repo,
+		ApiClient:        apiclient,
+		EgressPolicy:     config.EgressPolicy,
+		AllowedEndpoints: allowedEndpoints,
 	}
 
 	go startDNSServer(dnsProxy, hostDNSServer, errc)
@@ -95,8 +97,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	var ipAddressEndpoints []ipAddressEndpoint
 	if config.EgressPolicy == EgressPolicyBlock {
-		endpoints := addImplicitEndpoints(config.Endpoints)
-		for _, endpoint := range endpoints {
+		for _, endpoint := range allowedEndpoints {
 			// this will cause domain, IP mapping to be cached
 			ipAddress, err := dnsProxy.getIPByDomain(endpoint.domainName)
 			if err != nil {
