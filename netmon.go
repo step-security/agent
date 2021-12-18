@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -94,6 +95,10 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 			if isSYN {
 				netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
 					ipv4.DstIP.String(), port, netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
+
+				if netMonitor.Status == "Dropped" {
+					go writeLog(fmt.Sprintf("ip address dropped: %s", ipv4.DstIP.String()))
+				}
 			}
 		}
 		netMonitor.netMutex.Unlock()
