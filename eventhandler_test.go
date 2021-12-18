@@ -8,11 +8,6 @@ import (
 	"github.com/jarcoal/httpmock"
 )
 
-func init() {
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-}
-
 func TestEventHandler_HandleEvent(t *testing.T) {
 	type fields struct {
 		CorrelationId        string
@@ -27,6 +22,8 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 	}
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
+
+	httpmock.ActivateNonDefault(apiclient.Client)
 
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/github/owner/repo/actions/jobs/123/networkconnection", agentApiBaseUrl),
 		httpmock.NewStringResponder(200, ""))

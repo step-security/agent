@@ -74,29 +74,35 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	// TODO: fix the cache and time
 	Cache := InitCache(10 * 60 * 1000000000) // 10 * 60 seconds
 
+	allowedEndpoints := addImplicitEndpoints(config.Endpoints)
+	
 	// Start DNS servers and get confirmation
 	dnsProxy := DNSProxy{
-		Cache:         &Cache,
-		CorrelationId: config.CorrelationId,
-		Repo:          config.Repo,
-		ApiClient:     apiclient,
+		Cache:            &Cache,
+		CorrelationId:    config.CorrelationId,
+		Repo:             config.Repo,
+		ApiClient:        apiclient,
+		EgressPolicy:     config.EgressPolicy,
+		AllowedEndpoints: allowedEndpoints,
 	}
 
 	go startDNSServer(dnsProxy, hostDNSServer, errc)
 	go startDNSServer(dnsProxy, dockerDNSServer, errc) // this is for the docker bridge
 
+	// start proc mon
 	if cmd == nil {
 		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo, ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory}
 		go procMon.MonitorProcesses(errc)
-		writeLog("started p monitor")
+		writeLog("started process monitor")
 	}
 
 	dnsConfig := DnsConfig{}
 
 	var ipAddressEndpoints []ipAddressEndpoint
+	
+	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
-		endpoints := addImplicitEndpoints(config.Endpoints)
-		for _, endpoint := range endpoints {
+		for _, endpoint := range allowedEndpoints {
 			// this will cause domain, IP mapping to be cached
 			ipAddress, err := dnsProxy.getIPByDomain(endpoint.domainName)
 			if err != nil {
