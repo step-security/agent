@@ -8,7 +8,7 @@ import (
 )
 
 func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
-	writeLog("Monitor Processes called")
+	WriteLog("Monitor Processes called")
 }
 
 func getParentProcessId(pid string) (int, error) {

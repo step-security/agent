@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sync"
-	"time"
 
 	"github.com/florianl/go-nflog/v2"
 )
@@ -47,8 +45,6 @@ type IPTables interface {
 	ClearChain(table, chain string) error
 }
 
-var fileMutex sync.Mutex
-
 // Run the agent
 // TODO: move all inputs into a struct
 func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
@@ -67,15 +63,15 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL}
 
 	// TODO: pass in an iowriter/ use log library
-	writeLog(fmt.Sprintf("read config %v", config))
+	WriteLog(fmt.Sprintf("read config %v", config))
 
-	writeLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
+	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 
 	// TODO: fix the cache and time
 	Cache := InitCache(10 * 60 * 1000000000) // 10 * 60 seconds
 
 	allowedEndpoints := addImplicitEndpoints(config.Endpoints)
-	
+
 	// Start DNS servers and get confirmation
 	dnsProxy := DNSProxy{
 		Cache:            &Cache,
@@ -93,20 +89,20 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	if cmd == nil {
 		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo, ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory}
 		go procMon.MonitorProcesses(errc)
-		writeLog("started process monitor")
+		WriteLog("started process monitor")
 	}
 
 	dnsConfig := DnsConfig{}
 
 	var ipAddressEndpoints []ipAddressEndpoint
-	
+
 	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
 		for _, endpoint := range allowedEndpoints {
 			// this will cause domain, IP mapping to be cached
 			ipAddress, err := dnsProxy.getIPByDomain(endpoint.domainName)
 			if err != nil {
-				writeLog(fmt.Sprintf("Error resolving allowed domain %v", err))
+				WriteLog(fmt.Sprintf("Error resolving allowed domain %v", err))
 				RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 				return err
 			}
@@ -118,21 +114,21 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	// Change DNS config on host, causes processes to use agent's DNS proxy
 	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath, tempDir); err != nil {
-		writeLog(fmt.Sprintf("Error setting DNS server %v", err))
+		WriteLog(fmt.Sprintf("Error setting DNS server %v", err))
 		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 		return err
 	}
 
-	writeLog("updated resolved")
+	WriteLog("updated resolved")
 
 	// Change DNS for docker, causes process in containers to use agent's DNS proxy
 	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
-		writeLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
+		WriteLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
 		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 		return err
 	}
 
-	writeLog("set docker config")
+	WriteLog("set docker config")
 
 	if config.EgressPolicy == EgressPolicyAudit {
 		netMonitor := NetworkMonitor{
@@ -144,20 +140,20 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 		// Start network monitor
 		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
-		//writeLog("started net monitor")
-		writeLog("before audit rules")
+		
+		WriteLog("before audit rules")
 
 		// Add logging to firewall, including NFLOG rules
 		if err := AddAuditRules(iptables); err != nil {
-			writeLog(fmt.Sprintf("Error adding firewall rules %v", err))
+			WriteLog(fmt.Sprintf("Error adding firewall rules %v", err))
 			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 			return err
 		}
 
-		writeLog("added audit rules")
+		WriteLog("added audit rules")
 	} else if config.EgressPolicy == EgressPolicyBlock {
 
-		writeLog(fmt.Sprintf("Allowed domains:%v", config.Endpoints))
+		WriteLog(fmt.Sprintf("Allowed domains:%v", config.Endpoints))
 
 		netMonitor := NetworkMonitor{
 			CorrelationId: config.CorrelationId,
@@ -170,13 +166,13 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
 
 		if err := addBlockRulesForGitHubHostedRunner(ipAddressEndpoints); err != nil {
-			writeLog(fmt.Sprintf("Error setting firewall for allowed domains %v", err))
+			WriteLog(fmt.Sprintf("Error setting firewall for allowed domains %v", err))
 			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 			return err
 		}
 	}
 
-	writeLog("done")
+	WriteLog("done")
 
 	// Write the status file
 	writeStatus("Initialized")
@@ -186,7 +182,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		case <-ctx.Done():
 			return nil
 		case e := <-errc:
-			writeLog(fmt.Sprintf("Error in Initialization %v", e))
+			WriteLog(fmt.Sprintf("Error in Initialization %v", e))
 			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 			return e
 
@@ -210,29 +206,17 @@ func RevertChanges(iptables *Firewall, nflog AgentNflogger,
 	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string, dnsConfig DnsConfig) {
 	err := RevertFirewallChanges(iptables)
 	if err != nil {
-		writeLog(fmt.Sprintf("Error in RevertChanges %v", err))
+		WriteLog(fmt.Sprintf("Error in RevertChanges %v", err))
 	}
 	err = dnsConfig.RevertDNSServer(cmd, resolvdConfigPath)
 	if err != nil {
-		writeLog(fmt.Sprintf("Error in reverting DNS server changes %v", err))
+		WriteLog(fmt.Sprintf("Error in reverting DNS server changes %v", err))
 	}
 	err = dnsConfig.RevertDockerDNSServer(cmd, dockerDaemonConfigPath)
 	if err != nil {
-		writeLog(fmt.Sprintf("Error in reverting docker DNS server changes %v", err))
+		WriteLog(fmt.Sprintf("Error in reverting docker DNS server changes %v", err))
 	}
-	writeLog("Reverted changes")
-}
-
-func writeLog(message string) {
-	fileMutex.Lock()
-	defer fileMutex.Unlock()
-
-	f, _ := os.OpenFile("/home/agent/agent.log",
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-
-	defer f.Close()
-
-	f.WriteString(fmt.Sprintf("%s:%s\n", time.Now().String(), message))
+	WriteLog("Reverted changes")
 }
 
 func writeStatus(message string) {
