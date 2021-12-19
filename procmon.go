@@ -94,7 +94,7 @@ func (p *ProcessMonitor) PrepareEvent(sequence int, eventMap map[string]interfac
 		argCountStr := fmt.Sprintf("%v", argc)
 		argCount, err := strconv.Atoi(argCountStr)
 		if err != nil {
-			writeLog(fmt.Sprintf("could not parse argc:%v", argc))
+			WriteLog(fmt.Sprintf("could not parse argc:%v", argc))
 		}
 		for i := 0; i < argCount; i++ {
 			p.Events[sequence].ProcessArguments = append(p.Events[sequence].ProcessArguments, fmt.Sprintf("%v", eventMap[fmt.Sprintf("a%d", i)]))

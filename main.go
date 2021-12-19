@@ -34,12 +34,12 @@ func main() {
 				case syscall.SIGHUP:
 					c.init(agentConfigFilePath)
 				case os.Interrupt:
-					writeLog("got os.kill")
+					WriteLog("got os.kill")
 					cancel()
 					os.Exit(1)
 				}
 			case <-ctx.Done():
-				writeLog("called ctx.Done()")
+				WriteLog("called ctx.Done()")
 				os.Exit(1)
 			}
 		}

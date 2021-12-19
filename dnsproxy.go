@@ -96,7 +96,8 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	if proxy.EgressPolicy == EgressPolicyBlock {
 		if !proxy.isAllowedDomain(domain) {
-			go writeLog(fmt.Sprintf("domain not allowed: %s", domain))
+			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
+			go WriteAnnotation(AnnotationError, fmt.Sprintf("DNS resolution for domain %s was blocked", domain))
 			return "", fmt.Errorf("domain not allowed %s", domain)
 		}
 	}
@@ -127,7 +128,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		if answer.Type == 1 {
 			proxy.Cache.Set(domain, answer.Data)
 
-			go writeLog(fmt.Sprintf("domain resolved: %s, ip address: %s", domain, answer.Data))
+			go WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s", domain, answer.Data))
 
 			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data)
 

@@ -39,7 +39,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	}
 
 	if strings.Contains(event.FileName, "post_event.json") {
-		writeLog("post_event called")
+		WriteLog("post_event called")
 
 		// send done signal to post step
 		writeDone()
