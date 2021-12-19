@@ -140,7 +140,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 		// Start network monitor
 		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
-		
+
 		WriteLog("before audit rules")
 
 		// Add logging to firewall, including NFLOG rules
@@ -197,6 +197,7 @@ func addImplicitEndpoints(endpoints []Endpoint) []Endpoint {
 		{domainName: "codeload.github.com", port: 443},                     // GitHub
 		{domainName: "token.actions.githubusercontent.com", port: 443},     // GitHub
 		{domainName: "vstoken.actions.githubusercontent.com", port: 443},   // GitHub
+		{domainName: "vstsmms.actions.githubusercontent.com", port: 443},   // GitHub
 	}
 
 	return append(endpoints, implicitEndpoints...)
