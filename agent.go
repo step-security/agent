@@ -140,7 +140,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 		// Start network monitor
 		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
-		//writeLog("started net monitor")
+		
 		WriteLog("before audit rules")
 
 		// Add logging to firewall, including NFLOG rules

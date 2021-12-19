@@ -44,7 +44,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to delete audit rules")
 	}
 
-	writeLog("Rules deleted")
+	WriteLog("Rules deleted")
 
 	// files modified in working directory
 	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/runner", fileMonitorTag))
@@ -136,7 +136,6 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 
 		p.PrepareEvent(int(message.Sequence), eventMap)
 		if isEventReady(p.Events[int(message.Sequence)]) {
-			//writeLog(fmt.Sprintf("event sent %v", p.Events[int(message.Sequence)]))
 			go eventHandler.HandleEvent(p.Events[int(message.Sequence)])
 		}
 
