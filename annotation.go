@@ -8,9 +8,7 @@ import (
 
 var annotationMutex sync.Mutex
 
-const AnnotationError = "error"
-
-func WriteAnnotation(annotationType, message string) {
+func WriteAnnotation(message string) {
 	annotationMutex.Lock()
 	defer annotationMutex.Unlock()
 
@@ -19,5 +17,5 @@ func WriteAnnotation(annotationType, message string) {
 
 	defer f.Close()
 
-	f.WriteString(fmt.Sprintf("%s:%s\n", annotationType, message))
+	f.WriteString(fmt.Sprintf("%s\n", message))
 }

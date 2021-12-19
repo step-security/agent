@@ -98,7 +98,7 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 
 				if netMonitor.Status == "Dropped" {
 					go WriteLog(fmt.Sprintf("ip address dropped: %s", ipv4.DstIP.String()))
-					go WriteAnnotation(AnnotationError, fmt.Sprintf("Traffic to IP Address %s was blocked", ipv4.DstIP.String()))
+					go WriteAnnotation(fmt.Sprintf("Traffic to IP Address %s was blocked", ipv4.DstIP.String()))
 				}
 			}
 		}

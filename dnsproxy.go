@@ -97,7 +97,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	if proxy.EgressPolicy == EgressPolicyBlock {
 		if !proxy.isAllowedDomain(domain) {
 			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
-			go WriteAnnotation(AnnotationError, fmt.Sprintf("DNS resolution for domain %s was blocked", domain))
+			go WriteAnnotation(fmt.Sprintf("DNS resolution for domain %s was blocked", domain))
 			return "", fmt.Errorf("domain not allowed %s", domain)
 		}
 	}
