@@ -17,7 +17,7 @@ import (
 )
 
 func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
-	writeLog("Monitor Processes called")
+	WriteLog("Monitor Processes called")
 
 	client, err := libaudit.NewAuditClient(nil)
 	if err != nil {
@@ -25,7 +25,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	}
 	defer client.Close()
 
-	writeLog("NewAuditClient created")
+	WriteLog("NewAuditClient created")
 
 	status, err := client.GetStatus()
 	if err != nil {
@@ -38,7 +38,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		}
 	}
 
-	writeLog("Status is enabled")
+	WriteLog("Status is enabled")
 
 	if _, err = client.DeleteRules(); err != nil {
 		errc <- errors.Wrap(err, "failed to delete audit rules")
@@ -52,21 +52,21 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ := rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
-		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
-	writeLog("File monitor added")
+	WriteLog("File monitor added")
 
 	r, _ = flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/agent", fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
-		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
-	writeLog("Agent file monitor added")
+	WriteLog("Agent file monitor added")
 
 	// syscall connect
 	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S connect -k %s", netMonitorTag))
@@ -74,11 +74,11 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
-		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule for syscall connect")
 	}
 
-	writeLog("Net monitor added")
+	WriteLog("Net monitor added")
 
 	// syscall process start
 	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S execve -k %s", processMonitorTag))
@@ -86,7 +86,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
-		writeLog(fmt.Sprintf("failed to add audit rule %v", err))
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule for syscall execve")
 	}
 
@@ -96,14 +96,14 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 			return err
 		}
 	}*/
-	writeLog("Process monitor added")
+	WriteLog("Process monitor added")
 
 	// sending message to kernel registering our PID
 	if err = client.SetPID(libaudit.NoWait); err != nil {
 		errc <- errors.Wrap(err, "failed to set audit PID")
 	}
 
-	writeLog("receive called")
+	WriteLog("receive called")
 
 	p.receive(client)
 }
