@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -21,6 +22,7 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	Cache := InitCache(60 * 1000000000)
 	rrDnsGoogle, _ := dns.NewRR("dns.google. IN A 8.8.8.8")
 	rrDnsTest, _ := dns.NewRR("test.com. IN A 67.225.146.248")
+	rrDnsNotAllowed, _ := dns.NewRR(fmt.Sprintf("notallowed.com. IN A %s", StepSecuritySinkHoleIPAddress))
 	rrDnsAllowed, _ := dns.NewRR("allowed.com. IN A 67.225.146.248")
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
@@ -61,8 +63,8 @@ func TestDNSProxy_getResponse(t *testing.T) {
 		{name: "type A notallowed.com",
 			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "allowed.com"}}},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "notallowed.com.", Qtype: dns.TypeA}}}},
-			want:    &dns.Msg{},
-			wantErr: true,
+			want:    &dns.Msg{Answer: []dns.RR{rrDnsNotAllowed}},
+			wantErr: false,
 		},
 		{name: "type A test.com egress policy cached",
 			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "test.com"}}},
