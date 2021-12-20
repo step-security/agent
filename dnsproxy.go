@@ -39,6 +39,8 @@ type Answer struct {
 	Data string `json:"data"`
 }
 
+const StepSecuritySinkHoleIPAddress = "54.185.253.63"
+
 func (proxy *DNSProxy) getResponse(requestMsg *dns.Msg) (*dns.Msg, error) {
 
 	responseMsg := new(dns.Msg)
@@ -51,7 +53,6 @@ func (proxy *DNSProxy) getResponse(requestMsg *dns.Msg) (*dns.Msg, error) {
 
 			answer, err := proxy.processTypeA(&question, requestMsg)
 			if err != nil {
-
 				return responseMsg, err
 			}
 			responseMsg.Answer = append(responseMsg.Answer, *answer)
@@ -98,7 +99,14 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		if !proxy.isAllowedDomain(domain) {
 			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
 			go WriteAnnotation(fmt.Sprintf("DNS resolution for domain %s was blocked", domain))
-			return "", fmt.Errorf("domain not allowed %s", domain)
+
+			// return an ip address, so calling process calls the ip address
+			// the call will be blocked by the firewall
+			proxy.Cache.Set(domain, StepSecuritySinkHoleIPAddress)
+
+			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
+
+			return StepSecuritySinkHoleIPAddress, nil
 		}
 	}
 
