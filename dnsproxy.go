@@ -104,6 +104,8 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 			// the call will be blocked by the firewall
 			proxy.Cache.Set(domain, StepSecuritySinkHoleIPAddress)
 
+			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
+
 			return StepSecuritySinkHoleIPAddress, nil
 		}
 	}
