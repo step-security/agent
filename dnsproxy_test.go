@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -21,6 +22,7 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	Cache := InitCache(60 * 1000000000)
 	rrDnsGoogle, _ := dns.NewRR("dns.google. IN A 8.8.8.8")
 	rrDnsTest, _ := dns.NewRR("test.com. IN A 67.225.146.248")
+	rrDnsNotAllowed, _ := dns.NewRR(fmt.Sprintf("notallowed.com. IN A %s", StepSecuritySinkHoleIPAddress))
 	rrDnsAllowed, _ := dns.NewRR("allowed.com. IN A 67.225.146.248")
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
@@ -32,6 +34,9 @@ func TestDNSProxy_getResponse(t *testing.T) {
 
 	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=allowed.com.&type=a",
 		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"allowed.com.","type":1}],"Answer":[{"name":"allowed.com.","type":1,"TTL":3080,"data":"67.225.146.248"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=notfound.com.&type=a",
+		httpmock.NewStringResponder(200, `{"Status":3,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"notfound.com.","type":1}],"Authority":[{"name":"com.","type":6,"TTL":900,"data":"a.gtld-servers.net. nstld.verisign-grs.com. 1640040308 1800 900 604800 86400"}],"Comment":"Response from 2001:503:231d::2:30."}`))
 
 	tests := []struct {
 		name    string
@@ -61,8 +66,8 @@ func TestDNSProxy_getResponse(t *testing.T) {
 		{name: "type A notallowed.com",
 			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "allowed.com"}}},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "notallowed.com.", Qtype: dns.TypeA}}}},
-			want:    &dns.Msg{},
-			wantErr: true,
+			want:    &dns.Msg{Answer: []dns.RR{rrDnsNotAllowed}},
+			wantErr: false,
 		},
 		{name: "type A test.com egress policy cached",
 			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "test.com"}}},
@@ -75,6 +80,12 @@ func TestDNSProxy_getResponse(t *testing.T) {
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "allowed.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsAllowed}},
 			wantErr: false,
+		},
+		{name: "type A notfound.com",
+			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyAudit},
+			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "notfound.com.", Qtype: dns.TypeA}}}},
+			want:    &dns.Msg{},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

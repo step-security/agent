@@ -88,17 +88,21 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 		// Get actual TCP data from this layer
 		ipv4, _ := ipv4Layer.(*layers.IPv4)
 		netMonitor.netMutex.Lock()
-		_, found := ipAddresses[ipv4.DstIP.String()]
+		ipv4Address := ipv4.DstIP.String()
+		_, found := ipAddresses[ipv4Address]
 		if !found {
-			ipAddresses[ipv4.DstIP.String()] = 1
+			ipAddresses[ipv4Address] = 1
 
 			if isSYN {
 				netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
-					ipv4.DstIP.String(), port, netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
+					ipv4Address, port, netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
 
 				if netMonitor.Status == "Dropped" {
-					go WriteLog(fmt.Sprintf("ip address dropped: %s", ipv4.DstIP.String()))
-					go WriteAnnotation(fmt.Sprintf("Traffic to IP Address %s was blocked", ipv4.DstIP.String()))
+					go WriteLog(fmt.Sprintf("ip address dropped: %s", ipv4Address))
+
+					if ipv4Address != StepSecuritySinkHoleIPAddress { // Sinkhole IP address will be covered by DNS block
+						go WriteAnnotation(fmt.Sprintf("Traffic to IP Address %s was blocked", ipv4Address))
+					}
 				}
 			}
 		}
