@@ -53,7 +53,6 @@ func (proxy *DNSProxy) getResponse(requestMsg *dns.Msg) (*dns.Msg, error) {
 
 			answer, err := proxy.processTypeA(&question, requestMsg)
 			if err != nil {
-
 				return responseMsg, err
 			}
 			responseMsg.Answer = append(responseMsg.Answer, *answer)
