@@ -27,7 +27,7 @@ func Test_addAuditRules(t *testing.T) {
 	endpoints := []ipAddressEndpoint{}
 	endpoints = append(endpoints, ipAddressEndpoint{ipAddress: "1.1.1.1", port: "443"})
 
-	err = addBlockRulesForGitHubHostedRunner(endpoints)
+	err = addBlockRulesForGitHubHostedRunner(nil, endpoints)
 	if err != nil {
 		t.Errorf("Error not expected %v", err)
 	}

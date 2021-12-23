@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 )
 
@@ -15,7 +16,7 @@ type config struct {
 	RunId            string
 	WorkingDirectory string
 	APIURL           string
-	Endpoints        []Endpoint
+	Endpoints        map[string][]Endpoint
 	EgressPolicy     string
 }
 
@@ -57,19 +58,19 @@ func (c *config) init(configFilePath string) error {
 	return nil
 }
 
-func parseEndpoints(allowedEndpoints string) []Endpoint {
-	var endpoints []Endpoint
+func parseEndpoints(allowedEndpoints string) map[string][]Endpoint {
+	endpoints := make(map[string][]Endpoint)
 	endpointsArray := strings.Split(allowedEndpoints, " ")
 	for _, endpoint := range endpointsArray {
 		if len(endpoint) > 0 {
 			endpointParts := strings.Split(endpoint, ":")
 			domainName := endpointParts[0]
+			domainName = dns.Fqdn(domainName)
 			port := 443 // default to 443
 			if len(endpointParts) > 1 {
 				port, _ = strconv.Atoi(endpointParts[1])
 			}
-
-			endpoints = append(endpoints, Endpoint{domainName: domainName, port: port})
+			endpoints[domainName] = append(endpoints[domainName], Endpoint{domainName: domainName, port: port})
 		}
 	}
 

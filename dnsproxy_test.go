@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/miekg/dns"
@@ -14,16 +15,21 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	type fields struct {
 		Cache            *Cache
 		EgressPolicy     string
-		AllowedEndpoints []Endpoint
+		AllowedEndpoints map[string][]Endpoint
 	}
 	type args struct {
 		requestMsg *dns.Msg
 	}
-	Cache := InitCache(60 * 1000000000)
+	auditCache := InitCache(EgressPolicyAudit)
+	blockCache := InitCache(EgressPolicyBlock)
 	rrDnsGoogle, _ := dns.NewRR("dns.google. IN A 8.8.8.8")
 	rrDnsTest, _ := dns.NewRR("test.com. IN A 67.225.146.248")
 	rrDnsNotAllowed, _ := dns.NewRR(fmt.Sprintf("notallowed.com. IN A %s", StepSecuritySinkHoleIPAddress))
 	rrDnsAllowed, _ := dns.NewRR("allowed.com. IN A 67.225.146.248")
+	allowedEndpoints := make(map[string][]Endpoint)
+	allowedEndpoints["allowed.com."] = append(allowedEndpoints["allowed.com."], Endpoint{domainName: "allowed.com"})
+	allowedEndpointsTest := make(map[string][]Endpoint)
+	allowedEndpointsTest["test.com."] = append(allowedEndpointsTest["test.com."], Endpoint{domainName: "test.com"})
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
 
@@ -46,43 +52,43 @@ func TestDNSProxy_getResponse(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "type A dns.google",
-			fields:  fields{Cache: &Cache},
+			fields:  fields{Cache: &auditCache},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "dns.google.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsGoogle}},
 			wantErr: false,
 		},
 		{name: "type A test.com",
-			fields:  fields{Cache: &Cache},
+			fields:  fields{Cache: &auditCache},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "test.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsTest}},
 			wantErr: false,
 		},
 		{name: "type AAAA test.com",
-			fields:  fields{Cache: &Cache},
+			fields:  fields{Cache: &auditCache},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "test.com.", Qtype: dns.TypeAAAA}}}},
 			want:    &dns.Msg{},
 			wantErr: true,
 		},
 		{name: "type A notallowed.com",
-			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "allowed.com"}}},
+			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: allowedEndpoints},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "notallowed.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsNotAllowed}},
 			wantErr: false,
 		},
 		{name: "type A test.com egress policy cached",
-			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "test.com"}}},
+			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: allowedEndpointsTest},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "test.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsTest}},
 			wantErr: false,
 		},
 		{name: "type A allowed.com egress policy",
-			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "allowed.com"}}},
+			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: allowedEndpoints},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "allowed.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsAllowed}},
 			wantErr: false,
 		},
 		{name: "type A notfound.com",
-			fields:  fields{Cache: &Cache, EgressPolicy: EgressPolicyAudit},
+			fields:  fields{Cache: &auditCache, EgressPolicy: EgressPolicyAudit},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "notfound.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{},
 			wantErr: true,
@@ -106,5 +112,46 @@ func TestDNSProxy_getResponse(t *testing.T) {
 				t.Errorf("DNSProxy.getResponse() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDNSProxy_auditCacheTTL(t *testing.T) {
+	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
+
+	httpmock.ActivateNonDefault(apiclient.Client)
+
+	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=domain12345.com.&type=a",
+		httpmock.ResponderFromMultipleResponses(
+			[]*http.Response{
+				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain12345.com.","type":1}],"Answer":[{"name":"domain12345.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`),
+				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain12345.com.","type":1}],"Answer":[{"name":"domain12345.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`),
+			},
+			t.Log))
+
+	cache := InitCache(EgressPolicyAudit)
+
+	proxy := &DNSProxy{
+		Cache:        &cache,
+		ApiClient:    apiclient,
+		EgressPolicy: EgressPolicyAudit,
+	}
+
+	// should call httpmock
+	proxy.getResponse(&dns.Msg{Question: []dns.Question{{Name: "domain12345.com.", Qtype: dns.TypeA}}})
+
+	time.Sleep(2 * time.Second)
+
+	// should get from cache
+	proxy.getResponse(&dns.Msg{Question: []dns.Question{{Name: "domain12345.com.", Qtype: dns.TypeA}}})
+
+	time.Sleep(30 * time.Second)
+
+	// should call httpmock
+	proxy.getResponse(&dns.Msg{Question: []dns.Question{{Name: "domain12345.com.", Qtype: dns.TypeA}}})
+
+	info := httpmock.GetCallCountInfo()
+	count := info["GET https://dns.google/resolve?name=domain12345.com.&type=a"]
+	if count != 2 {
+		t.Errorf("incorrect call count %d, expected 2, %v", count, info)
 	}
 }
