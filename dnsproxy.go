@@ -103,7 +103,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 			// return an ip address, so calling process calls the ip address
 			// the call will be blocked by the firewall
-			proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt, Data: StepSecuritySinkHoleIPAddress})
+			proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt32, Data: StepSecuritySinkHoleIPAddress})
 
 			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
 
@@ -161,7 +161,7 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 			return nil, err
 		}
 
-		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt, Data: "8.8.8.8"})
+		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt32, Data: "8.8.8.8"})
 
 		return &rr, nil
 	}
