@@ -90,7 +90,7 @@ func deleteTempFile(path string) {
 func getContext(seconds int) context.Context {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
-	time.AfterFunc(2*time.Second, cancel)
+	time.AfterFunc(time.Duration(seconds)*time.Second, cancel)
 
 	return ctx
 }
