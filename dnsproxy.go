@@ -16,7 +16,7 @@ type DNSProxy struct {
 	Repo             string
 	ApiClient        *ApiClient
 	EgressPolicy     string
-	AllowedEndpoints []Endpoint
+	AllowedEndpoints map[string][]Endpoint
 }
 
 type DNSResponse struct {
@@ -79,8 +79,8 @@ func (proxy *DNSProxy) processOtherTypes(q *dns.Question, requestMsg *dns.Msg) (
 }
 
 func (proxy *DNSProxy) isAllowedDomain(domain string) bool {
-	for _, endpoint := range proxy.AllowedEndpoints {
-		if dns.Fqdn(endpoint.domainName) == dns.Fqdn(domain) {
+	for domainName, _ := range proxy.AllowedEndpoints {
+		if dns.Fqdn(domainName) == dns.Fqdn(domain) {
 			return true
 		}
 	}
@@ -88,12 +88,44 @@ func (proxy *DNSProxy) isAllowedDomain(domain string) bool {
 	return false
 }
 
+func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
+	url := fmt.Sprintf("https://dns.google/resolve?name=%s&type=a", domain)
+	resp, err := proxy.ApiClient.Client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error in response from dns.google %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		return nil, fmt.Errorf("error in response from dns.google %v", err)
+	}
+
+	var dnsReponse DNSResponse
+
+	err = json.Unmarshal([]byte(body), &dnsReponse)
+
+	if err != nil {
+		return nil, fmt.Errorf("error in response from dns.google %v", err)
+	}
+
+	for _, answer := range dnsReponse.Answer {
+		if answer.Type == 1 {
+			return &answer, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unable to resolve domain %s", domain)
+}
+
 func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	domain = dns.Fqdn(domain)
 	cacheMsg, found := proxy.Cache.Get(domain)
 
 	if found {
-		return cacheMsg.Data, nil
+		return cacheMsg.Value.Data, nil
 	}
 
 	if proxy.EgressPolicy == EgressPolicyBlock {
@@ -111,41 +143,19 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		}
 	}
 
-	url := fmt.Sprintf("https://dns.google/resolve?name=%s&type=a", domain)
-	resp, err := proxy.ApiClient.Client.Get(url)
+	answer, err := proxy.ResolveDomain(domain)
 	if err != nil {
 		return "", fmt.Errorf("error in response from dns.google %v", err)
 	}
 
-	defer resp.Body.Close()
+	proxy.Cache.Set(domain, answer)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	go WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d", domain, answer.Data, answer.TTL))
 
-	if err != nil {
-		return "", fmt.Errorf("error in response from dns.google %v", err)
-	}
+	go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data)
 
-	var dnsReponse DNSResponse
+	return answer.Data, nil
 
-	err = json.Unmarshal([]byte(body), &dnsReponse)
-
-	if err != nil {
-		return "", fmt.Errorf("error in response from dns.google %v", err)
-	}
-
-	for _, answer := range dnsReponse.Answer {
-		if answer.Type == 1 {
-			proxy.Cache.Set(domain, &answer)
-
-			go WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d", domain, answer.Data, answer.TTL))
-
-			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data)
-
-			return answer.Data, nil
-		}
-	}
-
-	return "", fmt.Errorf("not resolved")
 }
 
 func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.RR, error) {

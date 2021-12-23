@@ -23,7 +23,7 @@ func InitCache(egressPolicy string) Cache {
 	}
 }
 
-func (cache *Cache) Get(k string) (*Answer, bool) {
+func (cache *Cache) Get(k string) (*Element, bool) {
 	cache.mutex.RLock()
 
 	element, found := cache.elements[k]
@@ -34,20 +34,20 @@ func (cache *Cache) Get(k string) (*Answer, bool) {
 
 	if cache.egressPolicy == EgressPolicyAudit {
 		// TTL is in seconds
-		// if now minus time added is less than TTL, return nil, so new DNS request is made
-		if time.Now().Unix()-element.TimeAdded < int64(element.Value.TTL) {
+		// if now minus time added is greater than TTL, return nil, so new DNS request is made
+		if time.Now().Unix()-element.TimeAdded > int64(element.Value.TTL) {
 			cache.mutex.RUnlock()
 			return nil, false
 		} else {
 			cache.mutex.RUnlock()
-			return element.Value, true
+			return &element, true
 		}
 	} else {
 		// for block scenario
 		// return the found value
 		// a separate thread updates the cache before TTL expires
 		cache.mutex.RUnlock()
-		return element.Value, true
+		return &element, true
 	}
 }
 

@@ -14,7 +14,7 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	type fields struct {
 		Cache            *Cache
 		EgressPolicy     string
-		AllowedEndpoints []Endpoint
+		AllowedEndpoints map[string][]Endpoint
 	}
 	type args struct {
 		requestMsg *dns.Msg
@@ -25,6 +25,10 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	rrDnsTest, _ := dns.NewRR("test.com. IN A 67.225.146.248")
 	rrDnsNotAllowed, _ := dns.NewRR(fmt.Sprintf("notallowed.com. IN A %s", StepSecuritySinkHoleIPAddress))
 	rrDnsAllowed, _ := dns.NewRR("allowed.com. IN A 67.225.146.248")
+	allowedEndpoints := make(map[string][]Endpoint)
+	allowedEndpoints["allowed.com."] = append(allowedEndpoints["allowed.com."], Endpoint{domainName: "allowed.com"})
+	allowedEndpointsTest := make(map[string][]Endpoint)
+	allowedEndpointsTest["test.com."] = append(allowedEndpointsTest["test.com."], Endpoint{domainName: "test.com"})
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
 
@@ -65,19 +69,19 @@ func TestDNSProxy_getResponse(t *testing.T) {
 			wantErr: true,
 		},
 		{name: "type A notallowed.com",
-			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "allowed.com"}}},
+			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: allowedEndpoints},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "notallowed.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsNotAllowed}},
 			wantErr: false,
 		},
 		{name: "type A test.com egress policy cached",
-			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "test.com"}}},
+			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: allowedEndpointsTest},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "test.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsTest}},
 			wantErr: false,
 		},
 		{name: "type A allowed.com egress policy",
-			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: []Endpoint{{domainName: "allowed.com"}}},
+			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, AllowedEndpoints: allowedEndpoints},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "allowed.com.", Qtype: dns.TypeA}}}},
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsAllowed}},
 			wantErr: false,
