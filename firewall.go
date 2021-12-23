@@ -37,13 +37,13 @@ type ipAddressEndpoint struct {
 	port      string
 }
 
-func addBlockRulesForGitHubHostedRunner(endpoints []ipAddressEndpoint) error {
-	err := addBlockRules(endpoints, outputChain, defaultInterface, outbound)
+func addBlockRulesForGitHubHostedRunner(firewall *Firewall, endpoints []ipAddressEndpoint) error {
+	err := addBlockRules(firewall, endpoints, outputChain, defaultInterface, outbound)
 	if err != nil {
 		return errors.Wrap(err, "failed to add block rules for default interface")
 	}
 
-	err = addBlockRules(endpoints, dockerUserChain, dockerInterface, inbound)
+	err = addBlockRules(firewall, endpoints, dockerUserChain, dockerInterface, inbound)
 	if err != nil {
 		return errors.Wrap(err, "failed to add block rules for docker interface")
 	}
@@ -51,10 +51,18 @@ func addBlockRulesForGitHubHostedRunner(endpoints []ipAddressEndpoint) error {
 	return nil
 }
 
-func addBlockRules(endpoints []ipAddressEndpoint, chain, netInterface, direction string) error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return errors.Wrap(err, "new iptables failed")
+func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, netInterface, direction string) error {
+	var ipt IPTables
+	var err error
+	if firewall == nil {
+
+		ipt, err = iptables.New()
+
+		if err != nil {
+			return errors.Wrap(err, "new iptables failed")
+		}
+	} else {
+		ipt = firewall.IPTables
 	}
 
 	if chain == dockerUserChain {
@@ -144,6 +152,59 @@ func addBlockRules(endpoints []ipAddressEndpoint, chain, netInterface, direction
 
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Append failed: %v", err))
+	}
+
+	return nil
+}
+
+func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
+	var ipt IPTables
+	var err error
+	if firewall == nil {
+
+		ipt, err = iptables.New()
+
+		if err != nil {
+			return errors.Wrap(err, "new iptables failed")
+		}
+	} else {
+		ipt = firewall.IPTables
+	}
+
+	exists, err := ipt.Exists(filterTable, outputChain, outbound, defaultInterface, protocol, tcp,
+		destination, ipAddress,
+		destinationPort, port, target, accept)
+
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to check if endpoint exists ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
+	}
+
+	if !exists {
+		err = ipt.Insert(filterTable, outputChain, 1, outbound, defaultInterface, protocol, tcp,
+			destination, ipAddress,
+			destinationPort, port, target, accept)
+
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
+		}
+	}
+
+	exists, err = ipt.Exists(filterTable, dockerUserChain, inbound, dockerInterface, protocol, tcp,
+		destination, ipAddress,
+		destinationPort, port, target, accept)
+
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to check if endpoint exists ip:%s, port:%s, interface:%s", ipAddress, port, dockerInterface))
+	}
+
+	if !exists {
+		err = ipt.Insert(filterTable, dockerUserChain, 1, inbound, dockerInterface, protocol, tcp,
+			destination, ipAddress,
+			destinationPort, port, target, accept)
+
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
+		}
 	}
 
 	return nil

@@ -6,48 +6,57 @@ import (
 )
 
 type Element struct {
-	Value     interface{}
+	Value     *Answer
 	TimeAdded int64
 }
 
 type Cache struct {
-	elements       map[string]Element
-	mutex          sync.RWMutex
-	expirationTime int64
+	elements     map[string]Element
+	egressPolicy string
+	mutex        sync.RWMutex
 }
 
-func InitCache(expirationTime int64) Cache {
+func InitCache(egressPolicy string) Cache {
 	return Cache{
-		elements:       make(map[string]Element),
-		expirationTime: expirationTime,
+		elements:     make(map[string]Element),
+		egressPolicy: egressPolicy,
 	}
 }
 
-func (cache *Cache) Get(k string) (interface{}, bool) {
+func (cache *Cache) Get(k string) (*Element, bool) {
 	cache.mutex.RLock()
 
 	element, found := cache.elements[k]
 	if !found {
 		cache.mutex.RUnlock()
-		return "", false
-	}
-	if cache.expirationTime > 0 {
-		if time.Now().UnixNano()-cache.expirationTime > element.TimeAdded {
-			cache.mutex.RUnlock()
-			return "", false
-		}
+		return nil, false
 	}
 
-	cache.mutex.RUnlock()
-	return element.Value, true
+	if cache.egressPolicy == EgressPolicyAudit {
+		// TTL is in seconds
+		// if now minus time added is greater than TTL, return nil, so new DNS request is made
+		if time.Now().Unix()-element.TimeAdded > int64(element.Value.TTL) {
+			cache.mutex.RUnlock()
+			return nil, false
+		} else {
+			cache.mutex.RUnlock()
+			return &element, true
+		}
+	} else {
+		// for block scenario
+		// return the found value
+		// a separate thread updates the cache before TTL expires
+		cache.mutex.RUnlock()
+		return &element, true
+	}
 }
 
-func (cache *Cache) Set(k string, v interface{}) {
+func (cache *Cache) Set(k string, v *Answer) {
 	cache.mutex.Lock()
 
 	cache.elements[k] = Element{
 		Value:     v,
-		TimeAdded: time.Now().UnixNano(),
+		TimeAdded: time.Now().Unix(),
 	}
 
 	cache.mutex.Unlock()

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/florianl/go-nflog/v2"
 )
@@ -42,6 +43,8 @@ type Firewall struct {
 
 type IPTables interface {
 	Append(table, chain string, rulespec ...string) error
+	Insert(table, chain string, pos int, rulespec ...string) error
+	Exists(table, chain string, rulespec ...string) (bool, error)
 	ClearChain(table, chain string) error
 }
 
@@ -67,8 +70,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 
-	// TODO: fix the cache and time
-	Cache := InitCache(10 * 60 * 1000000000) // 10 * 60 seconds
+	Cache := InitCache(config.EgressPolicy)
 
 	allowedEndpoints := addImplicitEndpoints(config.Endpoints)
 
@@ -98,17 +100,19 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
-		for _, endpoint := range allowedEndpoints {
+		for domainName, endpoints := range allowedEndpoints {
 			// this will cause domain, IP mapping to be cached
-			ipAddress, err := dnsProxy.getIPByDomain(endpoint.domainName)
+			ipAddress, err := dnsProxy.getIPByDomain(domainName)
 			if err != nil {
 				WriteLog(fmt.Sprintf("Error resolving allowed domain %v", err))
 				RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 				return err
 			}
+			for _, endpoint := range endpoints {
+				// create list of ip address to be added to firewall
+				ipAddressEndpoints = append(ipAddressEndpoints, ipAddressEndpoint{ipAddress: ipAddress, port: fmt.Sprintf("%d", endpoint.port)})
+			}
 
-			// create list of ip address to be added to firewall
-			ipAddressEndpoints = append(ipAddressEndpoints, ipAddressEndpoint{ipAddress: ipAddress, port: fmt.Sprintf("%d", endpoint.port)})
 		}
 	}
 
@@ -165,11 +169,13 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		// Start network monitor
 		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
 
-		if err := addBlockRulesForGitHubHostedRunner(ipAddressEndpoints); err != nil {
+		if err := addBlockRulesForGitHubHostedRunner(iptables, ipAddressEndpoints); err != nil {
 			WriteLog(fmt.Sprintf("Error setting firewall for allowed domains %v", err))
 			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 			return err
 		}
+
+		go refreshDNSEntries(ctx, iptables, allowedEndpoints, &dnsProxy)
 	}
 
 	WriteLog("done")
@@ -190,7 +196,60 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	}
 }
 
-func addImplicitEndpoints(endpoints []Endpoint) []Endpoint {
+func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProxy) {
+	ticker := time.NewTicker(30 * time.Second)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				WriteLog("Refreshing DNS entries")
+				for domainName, endpoints := range allowedEndpoints {
+					element, found := dnsProxy.Cache.Get(domainName)
+					if found {
+						var err error
+						var answer *Answer
+						// check if DNS TTL is close to expiry
+						if time.Now().Unix()+10-element.TimeAdded > int64(element.Value.TTL) {
+							// resolve domain name
+							answer, err = dnsProxy.ResolveDomain(domainName)
+							if err != nil {
+								// log and continue
+								WriteLog(fmt.Sprintf("domain could not be resolved: %s, %v", domainName, err))
+								continue
+							}
+
+							for _, endpoint := range endpoints {
+								// add endpoint to firewall
+								err = InsertAllowRule(iptables, answer.Data, fmt.Sprintf("%d", endpoint.port))
+								if err != nil {
+									break
+								}
+							}
+
+							if err != nil {
+								// log and continue
+								WriteLog(fmt.Sprintf("failed to insert new ipaddress in firewall: %s, %v", domainName, err))
+								continue
+							}
+
+							// add to cache with new TTL
+							dnsProxy.Cache.Set(domainName, answer)
+
+							go dnsProxy.ApiClient.sendDNSRecord(dnsProxy.CorrelationId, dnsProxy.Repo, domainName, answer.Data)
+
+							WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d", domainName, answer.Data, answer.TTL))
+						}
+					}
+				}
+			}
+		}
+	}()
+
+}
+
+func addImplicitEndpoints(endpoints map[string][]Endpoint) map[string][]Endpoint {
 	implicitEndpoints := []Endpoint{
 		{domainName: "agent.api.stepsecurity.io", port: 443},               // Should be implicit based on user feedback
 		{domainName: "pipelines.actions.githubusercontent.com", port: 443}, // GitHub
@@ -200,7 +259,11 @@ func addImplicitEndpoints(endpoints []Endpoint) []Endpoint {
 		{domainName: "vstsmms.actions.githubusercontent.com", port: 443},   // GitHub
 	}
 
-	return append(endpoints, implicitEndpoints...)
+	for _, endpoint := range implicitEndpoints {
+		endpoints[endpoint.domainName] = append(endpoints[endpoint.domainName], endpoint)
+	}
+
+	return endpoints
 }
 
 func RevertChanges(iptables *Firewall, nflog AgentNflogger,
