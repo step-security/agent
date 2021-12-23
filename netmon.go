@@ -24,7 +24,7 @@ type NetworkMonitor struct {
 
 var ipAddresses = make(map[string]int)
 
-func (netMonitor *NetworkMonitor) MonitorNetwork(nflogger AgentNflogger, errc chan error) []string {
+func (netMonitor *NetworkMonitor) MonitorNetwork(ctx context.Context, nflogger AgentNflogger, errc chan error) []string {
 
 	//sysLogger, err := syslog.NewLogger(syslog.LOG_INFO|syslog.LOG_USER, 1)
 	var err error
@@ -47,9 +47,6 @@ func (netMonitor *NetworkMonitor) MonitorNetwork(nflogger AgentNflogger, errc ch
 		}
 	}
 	defer nf.Close()
-
-	ctx, cancel := context.WithCancel(context.Background()) // TODO: Pass context from the top
-	defer cancel()
 
 	fn := func(attrs nflog.Attribute) int {
 		go netMonitor.handlePacket(attrs)

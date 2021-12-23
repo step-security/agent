@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/miekg/dns"
@@ -111,5 +112,46 @@ func TestDNSProxy_getResponse(t *testing.T) {
 				t.Errorf("DNSProxy.getResponse() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDNSProxy_auditCacheTTL(t *testing.T) {
+	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
+
+	httpmock.ActivateNonDefault(apiclient.Client)
+
+	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=domain12345.com.&type=a",
+		httpmock.ResponderFromMultipleResponses(
+			[]*http.Response{
+				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain12345.com.","type":1}],"Answer":[{"name":"domain12345.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`),
+				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain12345.com.","type":1}],"Answer":[{"name":"domain12345.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`),
+			},
+			t.Log))
+
+	cache := InitCache(EgressPolicyAudit)
+
+	proxy := &DNSProxy{
+		Cache:        &cache,
+		ApiClient:    apiclient,
+		EgressPolicy: EgressPolicyAudit,
+	}
+
+	// should call httpmock
+	proxy.getResponse(&dns.Msg{Question: []dns.Question{{Name: "domain12345.com.", Qtype: dns.TypeA}}})
+
+	time.Sleep(2 * time.Second)
+
+	// should get from cache
+	proxy.getResponse(&dns.Msg{Question: []dns.Question{{Name: "domain12345.com.", Qtype: dns.TypeA}}})
+
+	time.Sleep(30 * time.Second)
+
+	// should call httpmock
+	proxy.getResponse(&dns.Msg{Question: []dns.Question{{Name: "domain12345.com.", Qtype: dns.TypeA}}})
+
+	info := httpmock.GetCallCountInfo()
+	count := info["GET https://dns.google/resolve?name=domain12345.com.&type=a"]
+	if count != 2 {
+		t.Errorf("incorrect call count %d, expected 2, %v", count, info)
 	}
 }

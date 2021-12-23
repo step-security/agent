@@ -113,6 +113,9 @@ func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 
 	for _, answer := range dnsReponse.Answer {
 		if answer.Type == 1 {
+			if answer.TTL < 30 {
+				answer.TTL = 30 // less than 30 will cause too frequent DNS requests in audit scenario
+			}
 			return &answer, nil
 		}
 	}
