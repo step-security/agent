@@ -37,6 +37,14 @@ func (m *MockIPTables) Append(table, chain string, rulespec ...string) error {
 	return nil
 }
 
+func (m *MockIPTables) Exists(table, chain string, rulespec ...string) (bool, error) {
+	return false, nil
+}
+
+func (m *MockIPTables) Insert(table, chain string, post int, rulespec ...string) error {
+	return nil
+}
+
 func (m *MockIPTables) ClearChain(table, chain string) error {
 	return nil
 }
@@ -129,23 +137,34 @@ func TestRun(t *testing.T) {
 		{name: "success", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
+
 		{name: "success monitor process", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: nil, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
+
 		{name: "success allowed endpoints", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent-allowed-endpoints.json",
 			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
-			iptables: nil, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
-			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
-		{name: "success allowed endpoints DNS refresh", args: args{ctxCancelDuration: 60, configFilePath: "./testfiles/agent-allowed-endpoints.json",
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
+
+		{name: "success allowed endpoints CI Test", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent-allowed-endpoints.json",
 			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: nil, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
+
+		{name: "success allowed endpoints DNS refresh CI Test", args: args{ctxCancelDuration: 60, configFilePath: "./testfiles/agent-allowed-endpoints.json",
+			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: nil, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
+
 		{name: "dns failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServerWithError{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+
 		{name: "cmd failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommandWithError{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+
 		{name: "nflog failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNfloggerWithErr{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},

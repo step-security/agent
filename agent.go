@@ -43,6 +43,8 @@ type Firewall struct {
 
 type IPTables interface {
 	Append(table, chain string, rulespec ...string) error
+	Insert(table, chain string, pos int, rulespec ...string) error
+	Exists(table, chain string, rulespec ...string) (bool, error)
 	ClearChain(table, chain string) error
 }
 
@@ -167,13 +169,13 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		// Start network monitor
 		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
 
-		if err := addBlockRulesForGitHubHostedRunner(ipAddressEndpoints); err != nil {
+		if err := addBlockRulesForGitHubHostedRunner(iptables, ipAddressEndpoints); err != nil {
 			WriteLog(fmt.Sprintf("Error setting firewall for allowed domains %v", err))
 			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 			return err
 		}
 
-		go refreshDNSEntries(allowedEndpoints, &dnsProxy)
+		go refreshDNSEntries(iptables, allowedEndpoints, &dnsProxy)
 	}
 
 	WriteLog("done")
@@ -194,7 +196,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	}
 }
 
-func refreshDNSEntries(allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProxy) {
+func refreshDNSEntries(iptables *Firewall, allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProxy) {
 	ticker := time.NewTicker(30 * time.Second)
 	go func() {
 		for {
@@ -218,7 +220,7 @@ func refreshDNSEntries(allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProx
 
 							for _, endpoint := range endpoints {
 								// add endpoint to firewall
-								err = InsertAllowRule(answer.Data, fmt.Sprintf("%d", endpoint.port))
+								err = InsertAllowRule(iptables, answer.Data, fmt.Sprintf("%d", endpoint.port))
 								if err != nil {
 									break
 								}

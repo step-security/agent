@@ -37,13 +37,13 @@ type ipAddressEndpoint struct {
 	port      string
 }
 
-func addBlockRulesForGitHubHostedRunner(endpoints []ipAddressEndpoint) error {
-	err := addBlockRules(endpoints, outputChain, defaultInterface, outbound)
+func addBlockRulesForGitHubHostedRunner(firewall *Firewall, endpoints []ipAddressEndpoint) error {
+	err := addBlockRules(firewall, endpoints, outputChain, defaultInterface, outbound)
 	if err != nil {
 		return errors.Wrap(err, "failed to add block rules for default interface")
 	}
 
-	err = addBlockRules(endpoints, dockerUserChain, dockerInterface, inbound)
+	err = addBlockRules(firewall, endpoints, dockerUserChain, dockerInterface, inbound)
 	if err != nil {
 		return errors.Wrap(err, "failed to add block rules for docker interface")
 	}
@@ -51,10 +51,18 @@ func addBlockRulesForGitHubHostedRunner(endpoints []ipAddressEndpoint) error {
 	return nil
 }
 
-func addBlockRules(endpoints []ipAddressEndpoint, chain, netInterface, direction string) error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return errors.Wrap(err, "new iptables failed")
+func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, netInterface, direction string) error {
+	var ipt IPTables
+	var err error
+	if firewall == nil {
+
+		ipt, err = iptables.New()
+
+		if err != nil {
+			return errors.Wrap(err, "new iptables failed")
+		}
+	} else {
+		ipt = firewall.IPTables
 	}
 
 	if chain == dockerUserChain {
@@ -149,10 +157,18 @@ func addBlockRules(endpoints []ipAddressEndpoint, chain, netInterface, direction
 	return nil
 }
 
-func InsertAllowRule(ipAddress, port string) error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return errors.Wrap(err, "new iptables failed")
+func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
+	var ipt IPTables
+	var err error
+	if firewall == nil {
+
+		ipt, err = iptables.New()
+
+		if err != nil {
+			return errors.Wrap(err, "new iptables failed")
+		}
+	} else {
+		ipt = firewall.IPTables
 	}
 
 	exists, err := ipt.Exists(filterTable, outputChain, outbound, defaultInterface, protocol, tcp,
