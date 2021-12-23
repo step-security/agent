@@ -128,6 +128,9 @@ func TestRun(t *testing.T) {
 		httpmock.ResponderFromMultipleResponses(
 			[]*http.Response{
 				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain2.com.","type":1}],"Answer":[{"name":"domain2.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`),
+				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain2.com.","type":1}],"Answer":[{"name":"domain2.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`),
+				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain2.com.","type":1}],"Answer":[{"name":"domain2.com.","type":1,"TTL":30,"data":"70.70.70.70"}]}`),
+				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain2.com.","type":1}],"Answer":[{"name":"domain2.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`),
 				httpmock.NewStringResponse(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain2.com.","type":1}],"Answer":[{"name":"domain2.com.","type":1,"TTL":30,"data":"70.70.70.70"}]}`),
 			},
 			t.Log))
