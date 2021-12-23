@@ -164,7 +164,7 @@ func InsertAllowRule(ipAddress, port string) error {
 	}
 
 	if !exists {
-		err = ipt.Insert(filterTable, outputChain, 0, outbound, defaultInterface, protocol, tcp,
+		err = ipt.Insert(filterTable, outputChain, 1, outbound, defaultInterface, protocol, tcp,
 			destination, ipAddress,
 			destinationPort, port, target, accept)
 
@@ -182,7 +182,7 @@ func InsertAllowRule(ipAddress, port string) error {
 	}
 
 	if !exists {
-		err = ipt.Insert(filterTable, dockerUserChain, 0, inbound, dockerInterface, protocol, tcp,
+		err = ipt.Insert(filterTable, dockerUserChain, 1, inbound, dockerInterface, protocol, tcp,
 			destination, ipAddress,
 			destinationPort, port, target, accept)
 
