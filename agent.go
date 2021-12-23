@@ -143,7 +143,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		}
 
 		// Start network monitor
-		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
+		go netMonitor.MonitorNetwork(ctx, nflog, errc) // listens for NFLOG messages
 
 		WriteLog("before audit rules")
 
@@ -167,7 +167,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		}
 
 		// Start network monitor
-		go netMonitor.MonitorNetwork(nflog, errc) // listens for NFLOG messages
+		go netMonitor.MonitorNetwork(ctx, nflog, errc) // listens for NFLOG messages
 
 		if err := addBlockRulesForGitHubHostedRunner(iptables, ipAddressEndpoints); err != nil {
 			WriteLog(fmt.Sprintf("Error setting firewall for allowed domains %v", err))
