@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/florianl/go-nflog/v2"
+	"github.com/jarcoal/httpmock"
 )
 
 type mockDNSServer struct {
@@ -108,6 +109,14 @@ func TestRun(t *testing.T) {
 		dockerDaemonConfigPath string
 		ciTestOnly             bool
 	}
+
+	httpmock.Activate()
+
+	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=domain1.com.&type=a",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain1.com.","type":1}],"Answer":[{"name":"domain1.com.","type":1,"TTL":30,"data":"67.67.67.67"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=domain2.com.&type=a",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain2.com.","type":1}],"Answer":[{"name":"domain2.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`))
 
 	tests := []struct {
 		name    string
