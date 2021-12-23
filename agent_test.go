@@ -118,6 +118,9 @@ func TestRun(t *testing.T) {
 	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=domain2.com.&type=a",
 		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"domain2.com.","type":1}],"Answer":[{"name":"domain2.com.","type":1,"TTL":30,"data":"68.68.68.68"}]}`))
 
+	httpmock.RegisterResponder("GET", "https://dns.google/resolve", // no query params to match all other requests
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
+
 	tests := []struct {
 		name    string
 		args    args
