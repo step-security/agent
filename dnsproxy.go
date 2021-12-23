@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
@@ -92,7 +93,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	cacheMsg, found := proxy.Cache.Get(domain)
 
 	if found {
-		return cacheMsg.(string), nil
+		return cacheMsg.Data, nil
 	}
 
 	if proxy.EgressPolicy == EgressPolicyBlock {
@@ -102,7 +103,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 			// return an ip address, so calling process calls the ip address
 			// the call will be blocked by the firewall
-			proxy.Cache.Set(domain, StepSecuritySinkHoleIPAddress)
+			proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt, Data: StepSecuritySinkHoleIPAddress})
 
 			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
 
@@ -134,9 +135,9 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	for _, answer := range dnsReponse.Answer {
 		if answer.Type == 1 {
-			proxy.Cache.Set(domain, answer.Data)
+			proxy.Cache.Set(domain, &answer)
 
-			go WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s", domain, answer.Data))
+			go WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d", domain, answer.Data, answer.TTL))
 
 			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data)
 
@@ -160,7 +161,7 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 			return nil, err
 		}
 
-		proxy.Cache.Set(q.Name, &rr)
+		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt, Data: "8.8.8.8"})
 
 		return &rr, nil
 	}

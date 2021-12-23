@@ -83,31 +83,6 @@ func (m *MockCommandWithError) Run() error {
 	return fmt.Errorf("failed to run command")
 }
 
-/*
-func TestRunWithNflogError(t *testing.T) {
-
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	time.AfterFunc(5*time.Second, cancel) // this should not be used, it should error out earlier
-
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/owner/repo/actions/runs/1287185438/monitor", agentApiBaseUrl),
-		httpmock.NewStringResponder(200, ""))
-
-	err := Run(ctx, "./testfiles/agent.json",
-		&mockDNSServer{}, &mockDNSServer{}, &Firewall{&MockIPTables{}},
-		&MockAgentNfloggerWithErr{}, &MockCommand{}, createTempFileWithContents(""), createTempFileWithContents("{}"), nil)
-
-	// if 2 seconds pass
-	if err == nil {
-		t.Fail()
-	}
-
-}
-*/
-
 func deleteTempFile(path string) {
 	os.Remove(path)
 }

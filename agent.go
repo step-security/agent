@@ -67,8 +67,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 
-	// TODO: fix the cache and time
-	Cache := InitCache(10 * 60 * 1000000000) // 10 * 60 seconds
+	Cache := InitCache(config.EgressPolicy)
 
 	allowedEndpoints := addImplicitEndpoints(config.Endpoints)
 
