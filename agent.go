@@ -175,7 +175,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			return err
 		}
 
-		go refreshDNSEntries(iptables, allowedEndpoints, &dnsProxy)
+		go refreshDNSEntries(ctx, iptables, allowedEndpoints, &dnsProxy)
 	}
 
 	WriteLog("done")
@@ -196,11 +196,13 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	}
 }
 
-func refreshDNSEntries(iptables *Firewall, allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProxy) {
+func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProxy) {
 	ticker := time.NewTicker(30 * time.Second)
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-ticker.C:
 				WriteLog("Refreshing DNS entries")
 				for domainName, endpoints := range allowedEndpoints {
