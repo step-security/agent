@@ -42,8 +42,8 @@ func Test_parseEndpoints(t *testing.T) {
 	}
 
 	wantEndpoints := make(map[string][]Endpoint)
-	wantEndpoints["proxy.golang.org"] = append(wantEndpoints["proxy.golang.org"], Endpoint{"proxy.golang.org", 443})
-	wantEndpoints["api.github.com"] = append(wantEndpoints["api.github.com"], Endpoint{"api.github.com", 443})
+	wantEndpoints["proxy.golang.org."] = append(wantEndpoints["proxy.golang.org."], Endpoint{"proxy.golang.org.", 443})
+	wantEndpoints["api.github.com."] = append(wantEndpoints["api.github.com."], Endpoint{"api.github.com.", 443})
 
 	tests := []struct {
 		name string

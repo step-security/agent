@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 )
 
@@ -64,6 +65,7 @@ func parseEndpoints(allowedEndpoints string) map[string][]Endpoint {
 		if len(endpoint) > 0 {
 			endpointParts := strings.Split(endpoint, ":")
 			domainName := endpointParts[0]
+			domainName = dns.Fqdn(domainName)
 			port := 443 // default to 443
 			if len(endpointParts) > 1 {
 				port, _ = strconv.Atoi(endpointParts[1])

@@ -200,6 +200,7 @@ func refreshDNSEntries(allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProx
 		for {
 			select {
 			case <-ticker.C:
+				WriteLog("Refreshing DNS entries")
 				for domainName, endpoints := range allowedEndpoints {
 					element, found := dnsProxy.Cache.Get(domainName)
 					if found {
