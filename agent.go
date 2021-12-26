@@ -82,14 +82,16 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		ApiClient:        apiclient,
 		EgressPolicy:     config.EgressPolicy,
 		AllowedEndpoints: allowedEndpoints,
+		ReverseIPLookup:  make(map[string]string),
 	}
 
-	go startDNSServer(dnsProxy, hostDNSServer, errc)
-	go startDNSServer(dnsProxy, dockerDNSServer, errc) // this is for the docker bridge
+	go startDNSServer(&dnsProxy, hostDNSServer, errc)
+	go startDNSServer(&dnsProxy, dockerDNSServer, errc) // this is for the docker bridge
 
 	// start proc mon
 	if cmd == nil {
-		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo, ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory}
+		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo,
+			ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory, DNSProxy: &dnsProxy}
 		go procMon.MonitorProcesses(errc)
 		WriteLog("started process monitor")
 	}
@@ -236,8 +238,6 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 
 							// add to cache with new TTL
 							dnsProxy.Cache.Set(domainName, answer)
-
-							go dnsProxy.ApiClient.sendDNSRecord(dnsProxy.CorrelationId, dnsProxy.Repo, domainName, answer.Data)
 
 							WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d", domainName, answer.Data, answer.TTL))
 						}

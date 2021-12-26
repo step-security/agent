@@ -17,6 +17,7 @@ type ProcessMonitor struct {
 	CorrelationId    string
 	Repo             string
 	ApiClient        *ApiClient
+	DNSProxy         *DNSProxy
 	WorkingDirectory string
 	Events           map[int]*Event
 	mutex            sync.RWMutex

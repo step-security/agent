@@ -5,18 +5,21 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"sync"
 
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 )
 
 type DNSProxy struct {
-	Cache            *Cache
-	CorrelationId    string
-	Repo             string
-	ApiClient        *ApiClient
-	EgressPolicy     string
-	AllowedEndpoints map[string][]Endpoint
+	Cache                *Cache
+	CorrelationId        string
+	Repo                 string
+	ApiClient            *ApiClient
+	EgressPolicy         string
+	AllowedEndpoints     map[string][]Endpoint
+	ReverseIPLookup      map[string]string
+	ReverseIPLookupMutex sync.RWMutex
 }
 
 type DNSResponse struct {
@@ -70,6 +73,25 @@ func (proxy *DNSProxy) getResponse(requestMsg *dns.Msg) (*dns.Msg, error) {
 	return responseMsg, nil
 }
 
+func (proxy *DNSProxy) SetReverseIPLookup(domain, ipAddress string) {
+	proxy.ReverseIPLookupMutex.Lock()
+
+	proxy.ReverseIPLookup[ipAddress] = domain
+
+	proxy.ReverseIPLookupMutex.Unlock()
+}
+
+func (proxy *DNSProxy) GetReverseIPLookup(ipAddress string) string {
+	proxy.ReverseIPLookupMutex.RLock()
+	domain, found := proxy.ReverseIPLookup[ipAddress]
+	proxy.ReverseIPLookupMutex.RUnlock()
+	if found {
+		return domain
+	} else {
+		return ""
+	}
+}
+
 func (proxy *DNSProxy) processOtherTypes(q *dns.Question, requestMsg *dns.Msg) (*dns.RR, error) {
 	queryMsg := new(dns.Msg)
 	requestMsg.CopyTo(queryMsg)
@@ -79,7 +101,7 @@ func (proxy *DNSProxy) processOtherTypes(q *dns.Question, requestMsg *dns.Msg) (
 }
 
 func (proxy *DNSProxy) isAllowedDomain(domain string) bool {
-	for domainName, _ := range proxy.AllowedEndpoints {
+	for domainName := range proxy.AllowedEndpoints {
 		if dns.Fqdn(domainName) == dns.Fqdn(domain) {
 			return true
 		}
@@ -191,11 +213,12 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 		return nil, err
 	}
 
-	return &rr, nil
+	proxy.SetReverseIPLookup(q.Name, ip)
 
+	return &rr, nil
 }
 
-func startDNSServer(dnsProxy DNSProxy, server DNSServer, errc chan error) {
+func startDNSServer(dnsProxy *DNSProxy, server DNSServer, errc chan error) {
 	dns.HandleFunc(".", func(w dns.ResponseWriter, r *dns.Msg) {
 		switch r.Opcode {
 		case dns.OpcodeQuery:
