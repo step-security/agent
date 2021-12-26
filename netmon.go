@@ -92,7 +92,7 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 
 			if isSYN {
 				netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
-					ipv4Address, port, netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
+					ipv4Address, port, "", netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
 
 				if netMonitor.Status == "Dropped" {
 					go WriteLog(fmt.Sprintf("ip address dropped: %s", ipv4Address))

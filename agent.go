@@ -82,14 +82,16 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		ApiClient:        apiclient,
 		EgressPolicy:     config.EgressPolicy,
 		AllowedEndpoints: allowedEndpoints,
+		ReverseIPLookup:  make(map[string]string),
 	}
 
-	go startDNSServer(dnsProxy, hostDNSServer, errc)
-	go startDNSServer(dnsProxy, dockerDNSServer, errc) // this is for the docker bridge
+	go startDNSServer(&dnsProxy, hostDNSServer, errc)
+	go startDNSServer(&dnsProxy, dockerDNSServer, errc) // this is for the docker bridge
 
 	// start proc mon
 	if cmd == nil {
-		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo, ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory}
+		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo,
+			ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory, DNSProxy: &dnsProxy}
 		go procMon.MonitorProcesses(errc)
 		WriteLog("started process monitor")
 	}

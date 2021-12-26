@@ -102,6 +102,7 @@ func TestDNSProxy_getResponse(t *testing.T) {
 				ApiClient:        apiclient,
 				EgressPolicy:     tt.fields.EgressPolicy,
 				AllowedEndpoints: tt.fields.AllowedEndpoints,
+				ReverseIPLookup:  make(map[string]string),
 			}
 			got, err := proxy.getResponse(tt.args.requestMsg)
 			if (err != nil) != tt.wantErr {
@@ -131,9 +132,10 @@ func TestDNSProxy_auditCacheTTL(t *testing.T) {
 	cache := InitCache(EgressPolicyAudit)
 
 	proxy := &DNSProxy{
-		Cache:        &cache,
-		ApiClient:    apiclient,
-		EgressPolicy: EgressPolicyAudit,
+		Cache:           &cache,
+		ApiClient:       apiclient,
+		EgressPolicy:    EgressPolicyAudit,
+		ReverseIPLookup: make(map[string]string),
 	}
 
 	// should call httpmock

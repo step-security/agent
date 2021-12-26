@@ -21,6 +21,7 @@ type EventHandler struct {
 	CorrelationId        string
 	Repo                 string
 	ApiClient            *ApiClient
+	DNSProxy             *DNSProxy
 	ProcessConnectionMap map[string]bool
 	ProcessFileMap       map[string]bool
 	ProcessMap           map[string]*Process
@@ -102,7 +103,8 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
 			}
 
-			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, "", event.Timestamp, tool)
+			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
+			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", event.Timestamp, tool)
 			eventHandler.ProcessConnectionMap[cacheKey] = true
 		}
 	}
