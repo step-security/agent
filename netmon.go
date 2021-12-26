@@ -91,10 +91,11 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 			ipAddresses[ipv4Address] = 1
 
 			if isSYN {
-				netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
-					ipv4Address, port, "", netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
-
 				if netMonitor.Status == "Dropped" {
+
+					netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
+						ipv4Address, port, "", netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
+
 					go WriteLog(fmt.Sprintf("ip address dropped: %s", ipv4Address))
 
 					if ipv4Address != StepSecuritySinkHoleIPAddress { // Sinkhole IP address will be covered by DNS block
