@@ -27,11 +27,12 @@ type FileEvent struct {
 }
 
 type NetworkConnection struct {
-	IPAddress string    `json:"ipAddress,omitempty"`
-	Port      string    `json:"port,omitempty"`
-	TimeStamp time.Time `json:"timestamp"`
-	Tool      Tool      `json:"tool"`
-	Status    string    `json:"status,omitempty"`
+	IPAddress  string    `json:"ipAddress,omitempty"`
+	Port       string    `json:"port,omitempty"`
+	DomainName string    `json:"domainName,omitempty"`
+	TimeStamp  time.Time `json:"timestamp"`
+	Tool       Tool      `json:"tool"`
+	Status     string    `json:"status,omitempty"`
 }
 
 type ApiClient struct {
@@ -54,12 +55,13 @@ func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAdd
 	return apiclient.sendApiRequest("POST", url, dnsRecord)
 }
 
-func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, port, status string, timestamp time.Time, tool Tool) error {
+func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, port, domainName, status string, timestamp time.Time, tool Tool) error {
 
 	networkConnection := &NetworkConnection{}
 
 	networkConnection.IPAddress = ipAddress
 	networkConnection.Port = port
+	networkConnection.DomainName = domainName
 	networkConnection.Status = status
 	networkConnection.TimeStamp = timestamp
 	networkConnection.Tool = tool

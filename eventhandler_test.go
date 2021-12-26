@@ -44,6 +44,13 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 			args: args{event: &Event{EventType: fileMonitorTag, Exe: "/path/to/exe", FileName: ".git/objects"}}},
 	}
 	for _, tt := range tests {
+		cache := InitCache(EgressPolicyAudit)
+		proxy := &DNSProxy{
+			Cache:           &cache,
+			ApiClient:       apiclient,
+			EgressPolicy:    EgressPolicyAudit,
+			ReverseIPLookup: make(map[string]string),
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			eventHandler := &EventHandler{
 				CorrelationId:        tt.fields.CorrelationId,
@@ -52,6 +59,7 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 				ProcessConnectionMap: tt.fields.ProcessConnectionMap,
 				ProcessFileMap:       tt.fields.ProcessFileMap,
 				ProcessMap:           tt.fields.ProcessMap,
+				DNSProxy:             proxy,
 			}
 			eventHandler.HandleEvent(tt.args.event)
 		})
