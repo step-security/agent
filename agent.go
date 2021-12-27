@@ -251,12 +251,13 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 
 func addImplicitEndpoints(endpoints map[string][]Endpoint) map[string][]Endpoint {
 	implicitEndpoints := []Endpoint{
-		{domainName: "agent.api.stepsecurity.io", port: 443},               // Should be implicit based on user feedback
-		{domainName: "pipelines.actions.githubusercontent.com", port: 443}, // GitHub
-		{domainName: "codeload.github.com", port: 443},                     // GitHub
-		{domainName: "token.actions.githubusercontent.com", port: 443},     // GitHub
-		{domainName: "vstoken.actions.githubusercontent.com", port: 443},   // GitHub
-		{domainName: "vstsmms.actions.githubusercontent.com", port: 443},   // GitHub
+		{domainName: "agent.api.stepsecurity.io", port: 443},                   // Should be implicit based on user feedback
+		{domainName: "pipelines.actions.githubusercontent.com", port: 443},     // GitHub
+		{domainName: "artifactcache.actions.githubusercontent.com", port: 443}, // GitHub
+		{domainName: "codeload.github.com", port: 443},                         // GitHub
+		{domainName: "token.actions.githubusercontent.com", port: 443},         // GitHub
+		{domainName: "vstoken.actions.githubusercontent.com", port: 443},       // GitHub
+		{domainName: "vstsmms.actions.githubusercontent.com", port: 443},       // GitHub
 	}
 
 	for _, endpoint := range implicitEndpoints {
