@@ -25,6 +25,7 @@ type EventHandler struct {
 	ProcessConnectionMap map[string]bool
 	ProcessFileMap       map[string]bool
 	ProcessMap           map[string]*Process
+	SourceCodeMap        map[string][]*Event
 	netMutex             sync.RWMutex
 	fileMutex            sync.RWMutex
 	procMutex            sync.RWMutex
@@ -49,7 +50,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	_, found := eventHandler.ProcessFileMap[event.Pid]
 	fileType := ""
 	if !found {
-
+		// TODO: Improve this logic to monitor dependencies across languages
 		if strings.Contains(event.FileName, "/node_modules/") && strings.HasSuffix(event.FileName, ".js") {
 			fileType = "Dependencies"
 
@@ -64,7 +65,28 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
+	if isSourceCodeFile(event.FileName) {
+		_, found = eventHandler.SourceCodeMap[event.FileName]
+		if found {
+			WriteAnnotation(fmt.Sprintf("Source code file overwritten %s", event.FileName))
+		}
+		eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+	}
+
 	eventHandler.fileMutex.Unlock()
+}
+
+func isSourceCodeFile(fileName string) bool {
+	ext := path.Ext(fileName)
+	// TODO: Add extensions
+	sourceCodeExtensions := []string{".go", ".js", ".cs", ".cpp"}
+	for _, extension := range sourceCodeExtensions {
+		if ext == extension {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (eventHandler *EventHandler) handleProcessEvent(event *Event) {

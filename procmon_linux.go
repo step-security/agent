@@ -114,6 +114,7 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 	eventHandler := EventHandler{CorrelationId: p.CorrelationId, Repo: p.Repo, ApiClient: p.ApiClient, DNSProxy: p.DNSProxy}
 	eventHandler.ProcessConnectionMap = make(map[string]bool)
 	eventHandler.ProcessFileMap = make(map[string]bool)
+	eventHandler.SourceCodeMap = make(map[string][]*Event)
 	eventHandler.ProcessMap = make(map[string]*Process)
 
 	for {
