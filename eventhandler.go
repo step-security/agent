@@ -65,7 +65,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
-	if isSourceCodeFile(event.FileName) {
+	if isSourceCodeFile(event.FileName) && event.Syscall != "chmod" {
 		_, found = eventHandler.SourceCodeMap[event.FileName]
 		if !found {
 			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
