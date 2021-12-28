@@ -67,10 +67,12 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 
 	if isSourceCodeFile(event.FileName) {
 		_, found = eventHandler.SourceCodeMap[event.FileName]
-		if found {
-			WriteAnnotation(fmt.Sprintf("Source code file overwritten %s", event.FileName))
-		}
 		eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+		if found {
+			for _, writeEvent := range eventHandler.SourceCodeMap[event.FileName] {
+				WriteAnnotation(fmt.Sprintf("Source code file overwritten %s syscall: %s pid: %s", writeEvent.FileName, writeEvent.Syscall, writeEvent.Pid))
+			}
+		}
 	}
 
 	eventHandler.fileMutex.Unlock()
