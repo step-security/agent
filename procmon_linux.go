@@ -137,7 +137,7 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 
 		p.PrepareEvent(int(message.Sequence), eventMap)
 		if isEventReady(p.Events[int(message.Sequence)]) {
-			p.markEventSent(p.Events[int(message.Sequence))
+			p.markEventSent(p.Events[int(message.Sequence)])
 			go eventHandler.HandleEvent(p.Events[int(message.Sequence)])
 		}
 
