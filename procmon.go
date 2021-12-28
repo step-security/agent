@@ -34,18 +34,19 @@ type Process struct {
 }
 
 type Event struct {
-	FileName         string
-	Path             string
-	Syscall          string
-	Exe              string
-	IPAddress        string
-	Port             string
-	Pid              string
-	ProcessArguments []string
-	PPid             string
-	Timestamp        time.Time
-	EventType        string
-	Status           string
+	FileName          string
+	Path              string
+	Syscall           string
+	Exe               string
+	IPAddress         string
+	Port              string
+	Pid               string
+	ProcessArguments  []string
+	PPid              string
+	Timestamp         time.Time
+	EventType         string
+	Status            string
+	SentForProcessing bool
 }
 
 func (p *ProcessMonitor) PrepareEvent(sequence int, eventMap map[string]interface{}) {
@@ -124,7 +125,17 @@ func getValue(key string, eventMap map[string]interface{}) string {
 	return ""
 }
 
+func (p *ProcessMonitor) markEventSent(event *Event) {
+	p.mutex.Lock()
+	event.SentForProcessing = true
+	p.mutex.Unlock()
+}
+
 func isEventReady(event *Event) bool {
+	if event.SentForProcessing {
+		return false
+	}
+
 	switch event.EventType {
 	case netMonitorTag:
 		if event.IPAddress != "" && event.Port != "" {
