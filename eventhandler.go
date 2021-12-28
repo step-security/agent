@@ -67,10 +67,20 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 
 	if isSourceCodeFile(event.FileName) {
 		_, found = eventHandler.SourceCodeMap[event.FileName]
-		eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+		if !found {
+			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+		}
 		if found {
+			isFromDifferentProcess := false
 			for _, writeEvent := range eventHandler.SourceCodeMap[event.FileName] {
-				WriteAnnotation(fmt.Sprintf("Source code file overwritten %s syscall: %s pid: %s", writeEvent.FileName, writeEvent.Syscall, writeEvent.Pid))
+				if writeEvent.Pid != event.Pid {
+					isFromDifferentProcess = true
+				}
+			}
+
+			if isFromDifferentProcess {
+				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+				WriteAnnotation(fmt.Sprintf("Source code file overwritten %s syscall: %s pid: %s", event.FileName, event.Syscall, event.Pid))
 			}
 		}
 	}
@@ -80,8 +90,8 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 
 func isSourceCodeFile(fileName string) bool {
 	ext := path.Ext(fileName)
-	// TODO: Add extensions
-	sourceCodeExtensions := []string{".go", ".js", ".cs", ".cpp"}
+	// https://docs.github.com/en/get-started/learning-about-github/github-language-support
+	sourceCodeExtensions := []string{".c", "cpp", "cs", ".go", ".java", ".js", ".php", "py", ".rb", ".rs", ".scala", ".sc", ".sh", ".ts"}
 	for _, extension := range sourceCodeExtensions {
 		if ext == extension {
 			return true
