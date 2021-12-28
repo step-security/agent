@@ -25,6 +25,7 @@ type EventHandler struct {
 	ProcessConnectionMap map[string]bool
 	ProcessFileMap       map[string]bool
 	ProcessMap           map[string]*Process
+	SourceCodeMap        map[string][]*Event
 	netMutex             sync.RWMutex
 	fileMutex            sync.RWMutex
 	procMutex            sync.RWMutex
@@ -49,7 +50,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	_, found := eventHandler.ProcessFileMap[event.Pid]
 	fileType := ""
 	if !found {
-
+		// TODO: Improve this logic to monitor dependencies across languages
 		if strings.Contains(event.FileName, "/node_modules/") && strings.HasSuffix(event.FileName, ".js") {
 			fileType = "Dependencies"
 
@@ -64,7 +65,40 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
+	if isSourceCodeFile(event.FileName) && event.Syscall != "chmod" {
+		_, found = eventHandler.SourceCodeMap[event.FileName]
+		if !found {
+			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+		}
+		if found {
+			isFromDifferentProcess := false
+			for _, writeEvent := range eventHandler.SourceCodeMap[event.FileName] {
+				if writeEvent.Pid != event.Pid {
+					isFromDifferentProcess = true
+				}
+			}
+
+			if isFromDifferentProcess {
+				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+				WriteAnnotation(fmt.Sprintf("Source code file overwritten %s syscall: %s pid: %s", event.FileName, event.Syscall, event.Pid))
+			}
+		}
+	}
+
 	eventHandler.fileMutex.Unlock()
+}
+
+func isSourceCodeFile(fileName string) bool {
+	ext := path.Ext(fileName)
+	// https://docs.github.com/en/get-started/learning-about-github/github-language-support
+	sourceCodeExtensions := []string{".c", "cpp", "cs", ".go", ".java", ".js", ".php", "py", ".rb", ".rs", ".scala", ".sc", ".sh", ".ts"}
+	for _, extension := range sourceCodeExtensions {
+		if ext == extension {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
