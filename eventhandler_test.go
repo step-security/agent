@@ -42,6 +42,8 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 			args: args{event: &Event{IPAddress: "127.0.0.53", Port: "53", EventType: netMonitorTag, Exe: "/path/to/exe"}}},
 		{name: "fileMonitorEvent", fields: fields{CorrelationId: "123", Repo: "owner/repo", ApiClient: apiclient, ProcessFileMap: make(map[string]bool)},
 			args: args{event: &Event{EventType: fileMonitorTag, Exe: "/path/to/exe", FileName: ".git/objects"}}},
+		{name: "fileMonitorEventSourceCode", fields: fields{CorrelationId: "123", Repo: "owner/repo", ApiClient: apiclient, ProcessFileMap: make(map[string]bool)},
+			args: args{event: &Event{EventType: fileMonitorTag, Exe: "/path/to/exe", FileName: "/path/to/code/code.go"}}},
 	}
 	for _, tt := range tests {
 		cache := InitCache(EgressPolicyAudit)
@@ -59,6 +61,7 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 				ProcessConnectionMap: tt.fields.ProcessConnectionMap,
 				ProcessFileMap:       tt.fields.ProcessFileMap,
 				ProcessMap:           tt.fields.ProcessMap,
+				SourceCodeMap:        make(map[string][]*Event),
 				DNSProxy:             proxy,
 			}
 			eventHandler.HandleEvent(tt.args.event)
