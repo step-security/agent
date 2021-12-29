@@ -65,7 +65,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
-	if isSourceCodeFile(event.FileName) && event.Syscall != "chmod" {
+	if isSourceCodeFile(event.FileName) && !isSyscallExcluded(event.Syscall) {
 		_, found = eventHandler.SourceCodeMap[event.FileName]
 		if !found {
 			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
@@ -86,6 +86,14 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	}
 
 	eventHandler.fileMutex.Unlock()
+}
+
+func isSyscallExcluded(syscall string) bool {
+	if syscall == "chmod" || syscall == "unlink" || syscall == "unlinkat" {
+		return true
+	}
+
+	return false
 }
 
 func isSourceCodeFile(fileName string) bool {
