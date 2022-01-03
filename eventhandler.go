@@ -239,6 +239,11 @@ func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 }
 
 func isPrivateIPAddress(ipAddress string) bool {
+	
+	if ipAddress == AllZeros {
+		return true
+	}
+
 	if classAPrivateSubnet == nil {
 		_, classAPrivateSubnet, _ = net.ParseCIDR(classAPrivateAddressRange)
 	}

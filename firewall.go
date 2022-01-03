@@ -32,6 +32,7 @@ const (
 	loopBackAddressRange      = "127.0.0.0/8"
 	AzureIPAddress            = "168.63.129.16"
 	MetadataIPAddress         = "169.254.169.254"
+	AllZeros                  = "0.0.0.0"
 )
 
 type ipAddressEndpoint struct {
