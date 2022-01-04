@@ -170,6 +170,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	answer, err := proxy.ResolveDomain(domain)
 	if err != nil {
+		go WriteLog(fmt.Sprintf("unable to resolve domain: %s", domain))
 		return "", fmt.Errorf("error in response from dns.google %v", err)
 	}
 
@@ -201,7 +202,7 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 		return &rr, nil
 	}
 
-	if q.Name == "host.docker.internal." {
+	/*if q.Name == "host.docker.internal." {
 		rr, err := dns.NewRR("host.docker.internal. IN A 127.0.0.1")
 
 		if err != nil {
@@ -211,7 +212,7 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt32, Data: "127.0.0.1"})
 
 		return &rr, nil
-	}
+	}*/
 
 	ip, err := proxy.getIPByDomain(q.Name)
 
