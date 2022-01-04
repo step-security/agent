@@ -202,13 +202,13 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 	}
 
 	if q.Name == "host.docker.internal." {
-		rr, err := dns.NewRR("host.docker.internal. IN A 172.17.0.1")
+		rr, err := dns.NewRR("host.docker.internal. IN A 127.0.0.1")
 
 		if err != nil {
 			return nil, err
 		}
 
-		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt32, Data: "172.17.0.1"})
+		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt32, Data: "127.0.0.1"})
 
 		return &rr, nil
 	}
