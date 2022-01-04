@@ -31,7 +31,7 @@ type EventHandler struct {
 	procMutex            sync.RWMutex
 }
 
-var classAPrivateSubnet, classBPrivateSubnet, classCPrivateSubnet, loopBackSubnet *net.IPNet
+var classAPrivateSubnet, classBPrivateSubnet, classCPrivateSubnet, loopBackSubnet, ipv6LinkLocalSubnet, ipv6LocalSubnet *net.IPNet
 
 func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	eventHandler.fileMutex.Lock()
@@ -239,6 +239,11 @@ func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 }
 
 func isPrivateIPAddress(ipAddress string) bool {
+	
+	if ipAddress == AllZeros {
+		return true
+	}
+
 	if classAPrivateSubnet == nil {
 		_, classAPrivateSubnet, _ = net.ParseCIDR(classAPrivateAddressRange)
 	}
@@ -250,6 +255,12 @@ func isPrivateIPAddress(ipAddress string) bool {
 	}
 	if loopBackSubnet == nil {
 		_, loopBackSubnet, _ = net.ParseCIDR(loopBackAddressRange)
+	}
+	if ipv6LinkLocalSubnet == nil {
+		_, ipv6LinkLocalSubnet, _ = net.ParseCIDR(ipv6LinkLocalAddressRange)
+	}
+	if ipv6LocalSubnet == nil {
+		_, ipv6LocalSubnet, _ = net.ParseCIDR(ipv6LocalAddressRange)
 	}
 
 	ip := net.ParseIP(ipAddress)
@@ -267,6 +278,19 @@ func isPrivateIPAddress(ipAddress string) bool {
 	}
 
 	if loopBackSubnet.Contains(ip) {
+		return true
+	}
+
+	if ipv6LinkLocalSubnet.Contains(ip) {
+		return true
+	}
+
+	if ipv6LocalSubnet.Contains(ip) {
+		return true
+	}
+
+	// https://gist.github.com/nanmu42/9c8139e15542b3c4a1709cb9e9ac61eb
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return true
 	}
 

@@ -27,9 +27,12 @@ const (
 	classAPrivateAddressRange = "10.0.0.0/8"
 	classBPrivateAddressRange = "172.16.0.0/12"
 	classCPrivateAddressRange = "192.168.0.0/16"
+	ipv6LinkLocalAddressRange = "fe80::/10"
+	ipv6LocalAddressRange     = "fc00::/7"
 	loopBackAddressRange      = "127.0.0.0/8"
 	AzureIPAddress            = "168.63.129.16"
 	MetadataIPAddress         = "169.254.169.254"
+	AllZeros                  = "0.0.0.0"
 )
 
 type ipAddressEndpoint struct {
