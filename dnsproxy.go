@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/miekg/dns"
@@ -154,6 +155,11 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	}
 
 	if proxy.EgressPolicy == EgressPolicyBlock {
+		if strings.HasSuffix(domain, ".internal.") || strings.HasSuffix(domain, ".internal.cloudapp.net.") {
+			go WriteLog(fmt.Sprintf("unable to resolve internal domains: %s", domain))
+			return "", fmt.Errorf("cannot resolve internal domains")
+		}
+
 		if !proxy.isAllowedDomain(domain) {
 			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
 			go WriteAnnotation(fmt.Sprintf("DNS resolution for domain %s was blocked", domain))
