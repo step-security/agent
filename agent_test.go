@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -166,6 +169,9 @@ func TestRun(t *testing.T) {
 		{name: "cmd failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommandWithError{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+		{name: "cmd is nil", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: nil, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
 
 		{name: "nflog failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNfloggerWithErr{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
@@ -207,4 +213,51 @@ func TestRun(t *testing.T) {
 			})
 		}
 	}
+}
+
+func Test_writeDone(t *testing.T) {
+	folder := "/home/agent"
+	file := folder + "/done.json"
+	err := os.Mkdir(folder, 0666)
+	defer func() {
+		// cleanup
+		os.RemoveAll(folder)
+	}()
+	if err != nil {
+		t.Errorf("unable to create folder: %s", folder)
+	}
+	writeDone()
+	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
+		t.Errorf("%s ; either doesn't exists or unable to write", file)
+	}
+
+}
+
+func Test_writeStatus(t *testing.T) {
+
+	folder := "/home/agent"
+	f := folder + "/agent.status"
+
+	err := os.Mkdir(folder, 0666)
+	defer func() {
+		// cleanup
+		os.RemoveAll(folder)
+	}()
+
+	if err != nil {
+		t.Errorf("unable to create %s folder", folder)
+	}
+
+	testString := "this is test"
+	writeStatus(testString)
+
+	fileContent, err := ioutil.ReadFile(f)
+	if err != nil {
+		t.Errorf("%s while reading %s", errors.Unwrap(err), f)
+	}
+
+	if strings.Compare(string(fileContent), testString) != 0 {
+		t.Errorf("file content mismatch")
+	}
+
 }
