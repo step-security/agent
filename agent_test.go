@@ -171,7 +171,7 @@ func TestRun(t *testing.T) {
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
 		{name: "cmd is nil", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: nil, resolvdConfigPath: createTempFileWithContents(""),
-			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
 
 		{name: "nflog failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNfloggerWithErr{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
@@ -215,7 +215,7 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func Test_writeDone(t *testing.T) {
+func TestWriteDone(t *testing.T) {
 	folder := "/home/agent"
 	file := folder + "/done.json"
 	err := os.Mkdir(folder, 0666)
@@ -233,7 +233,7 @@ func Test_writeDone(t *testing.T) {
 
 }
 
-func Test_writeStatus(t *testing.T) {
+func TestWriteStatus(t *testing.T) {
 
 	folder := "/home/agent"
 	f := folder + "/agent.status"
