@@ -220,7 +220,7 @@ func Test_writeDone(t *testing.T) {
 	file := folder + "/done.json"
 	err := os.Mkdir(folder, 0666)
 	defer func() {
-		// cleanup
+		// cleanupp
 		os.RemoveAll(folder)
 	}()
 	if err != nil {
