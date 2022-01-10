@@ -68,3 +68,23 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 		})
 	}
 }
+
+func TestGetContainerIdByPid(t *testing.T) {
+	type args struct {
+		cgroupPath string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{name: "Success", args: args{cgroupPath: "./testfiles/cgroup.txt"}, want: "0002745556f5dd47cd58d08a2b463e87ad792b2e64886a7f9ef20a8087a95a64"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetContainerIdByPid(tt.args.cgroupPath); got != tt.want {
+				t.Errorf("GetContainerIdByPid() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -204,31 +204,57 @@ func (eventHandler *EventHandler) HandleEvent(event *Event) {
 	}
 }
 
+func GetContainerIdByPid(cgroupPath string) string {
+	content, err := ioutil.ReadFile(cgroupPath)
+	if err != nil {
+		return ""
+	}
+
+	for _, line := range strings.Split(string(content), "\n") {
+		parts := strings.Split(line, ":")
+		if len(parts) > 2 && parts[1] == "memory" {
+			containerIdParts := strings.Split(parts[2], "/")
+			if len(containerIdParts) == 3 {
+				return containerIdParts[2]
+			}
+		}
+	}
+
+	return ""
+}
+
 func GetContainerByPid(pid string) string {
 	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
-	content, _ := ioutil.ReadFile(cgroupPath)
+	containerId := GetContainerIdByPid(cgroupPath)
+	if containerId == "" {
+		return ""
+	}
 
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		//panic(err)
+		return ""
 	}
 
 	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
-		//panic(err)
+		return ""
 	}
 
 	for _, container := range containers {
 		json, _ := cli.ContainerInspect(ctx, container.ID)
 		if strings.Compare(pid, fmt.Sprintf("%d", json.State.Pid)) == 0 {
 			return container.Image
-		} else if strings.Contains(string(content), container.ID) {
+		} else if containerId == container.ID {
 			return container.Image
 		}
 	}
 
-	return ""
+	// docker prints first 12 characters in the log
+	if len(containerId) > 12 {
+		return containerId[:12]
+	}
+	return containerId
 }
 
 func getProgramChecksum(path string) (string, error) {
