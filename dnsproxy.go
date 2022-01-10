@@ -160,10 +160,6 @@ func getDomainFromCloudAppFormat(domain string) string {
 func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	domain = dns.Fqdn(domain)
 
-	if strings.HasSuffix(domain, ".internal.cloudapp.net.") {
-		domain = getDomainFromCloudAppFormat(domain)
-	}
-
 	cacheMsg, found := proxy.Cache.Get(domain)
 
 	if found {
@@ -222,6 +218,10 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt32, Data: "8.8.8.8"})
 
 		return &rr, nil
+	}
+
+	if strings.HasSuffix(q.Name, ".internal.cloudapp.net.") {
+		q.Name = getDomainFromCloudAppFormat(q.Name)
 	}
 
 	ip, err := proxy.getIPByDomain(q.Name)
