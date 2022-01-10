@@ -227,11 +227,9 @@ func GetContainerIdByPid(cgroupPath string) string {
 
 func GetContainerByPid(pid string) string {
 	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
-	containerId := GetContainerIdByPid(cgroupPath)
-	if containerId == "" {
+	content, err := ioutil.ReadFile(cgroupPath)
+	if err != nil {
 		return ""
-	} else {
-		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
 	ctx := context.Background()
@@ -249,9 +247,17 @@ func GetContainerByPid(pid string) string {
 		json, _ := cli.ContainerInspect(ctx, container.ID)
 		if strings.Compare(pid, fmt.Sprintf("%d", json.State.Pid)) == 0 {
 			return container.Image
-		} else if containerId == container.ID {
+		} else if strings.Contains(string(content), container.ID) {
+			WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s, cgroup content: %s", container.ID, pid, string(content)))
 			return container.Image
 		}
+	}
+
+	containerId := GetContainerIdByPid(cgroupPath)
+	if containerId == "" {
+		return ""
+	} else {
+		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
 	// docker prints first 12 characters in the log
