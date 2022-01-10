@@ -79,6 +79,7 @@ func TestGetContainerIdByPid(t *testing.T) {
 		want string
 	}{
 		{name: "Success", args: args{cgroupPath: "./testfiles/cgroup.txt"}, want: "0002745556f5dd47cd58d08a2b463e87ad792b2e64886a7f9ef20a8087a95a64"},
+		{name: "Success with containerd", args: args{cgroupPath: "./testfiles/cgroup-containerd.txt"}, want: "9f21229140eb8ff3ab5b2b76c2536ddf4cc10811bc408ae9430324a0d85cf112"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

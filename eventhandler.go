@@ -214,7 +214,7 @@ func GetContainerIdByPid(cgroupPath string) string {
 		parts := strings.Split(line, ":")
 		if len(parts) > 2 && parts[1] == "memory" {
 			containerIdParts := strings.Split(parts[2], "/")
-			if len(containerIdParts) == 3 {
+			if len(containerIdParts) > 2 {
 				if containerIdParts[1] == "actions_job" {
 					return containerIdParts[2]
 				}
@@ -227,9 +227,11 @@ func GetContainerIdByPid(cgroupPath string) string {
 
 func GetContainerByPid(pid string) string {
 	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
-	content, err := ioutil.ReadFile(cgroupPath)
-	if err != nil {
+	containerId := GetContainerIdByPid(cgroupPath)
+	if containerId == "" {
 		return ""
+	} else {
+		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
 	ctx := context.Background()
@@ -247,17 +249,10 @@ func GetContainerByPid(pid string) string {
 		json, _ := cli.ContainerInspect(ctx, container.ID)
 		if strings.Compare(pid, fmt.Sprintf("%d", json.State.Pid)) == 0 {
 			return container.Image
-		} else if strings.Contains(string(content), container.ID) {
-			WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s, cgroup content: %s", container.ID, pid, string(content)))
+		} else if containerId == container.ID {
+			WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", container.ID, pid))
 			return container.Image
 		}
-	}
-
-	containerId := GetContainerIdByPid(cgroupPath)
-	if containerId == "" {
-		return ""
-	} else {
-		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
 	// docker prints first 12 characters in the log
