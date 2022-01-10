@@ -121,6 +121,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 	eventHandler.procMutex.Unlock()
 }
 
+/*
 func printContainerInfo(pid, ppid string) {
 	WriteLog(fmt.Sprintf("printContainerInfo pid:%s, ppid:%s", pid, ppid))
 	ctx := context.Background()
@@ -155,7 +156,7 @@ func printContainerInfo(pid, ppid string) {
 		WriteLog("cgroup content:")
 		WriteLog(string(content))
 	}
-}
+}*/
 
 func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	eventHandler.netMutex.Lock()
