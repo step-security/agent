@@ -230,6 +230,8 @@ func GetContainerByPid(pid string) string {
 	containerId := GetContainerIdByPid(cgroupPath)
 	if containerId == "" {
 		return ""
+	} else {
+		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
 	ctx := context.Background()
