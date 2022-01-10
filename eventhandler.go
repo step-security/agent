@@ -99,7 +99,8 @@ func isSyscallExcluded(syscall string) bool {
 func isSourceCodeFile(fileName string) bool {
 	ext := path.Ext(fileName)
 	// https://docs.github.com/en/get-started/learning-about-github/github-language-support
-	sourceCodeExtensions := []string{".c", "cpp", "cs", ".go", ".java", ".js", ".php", "py", ".rb", ".rs", ".scala", ".sc", ".sh", ".ts"}
+	// TODO: Add js & ts back. node makes change to js files as part of downloading/ setting up dependencies
+	sourceCodeExtensions := []string{".c", "cpp", "cs", ".go", ".java", ".php", "py", ".rb", ".rs", ".scala", ".sc", ".sh"}
 	for _, extension := range sourceCodeExtensions {
 		if ext == extension {
 			return true
