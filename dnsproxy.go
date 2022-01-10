@@ -220,6 +220,7 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 		return &rr, nil
 	}
 
+	// Azure VM sometimes sends domain name with suffix of internal.cloudapp.net.
 	if strings.HasSuffix(q.Name, ".internal.cloudapp.net.") {
 		q.Name = getDomainFromCloudAppFormat(q.Name)
 	}
