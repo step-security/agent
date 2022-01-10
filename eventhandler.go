@@ -170,10 +170,6 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 		_, found := eventHandler.ProcessConnectionMap[cacheKey]
 
 		if !found {
-			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
-			if strings.Contains(reverseLookUp, "dl-cdn.alpinelinux.") {
-				printContainerInfo(event.Pid, event.PPid)
-			}
 			tool := Tool{}
 			image := GetContainerByPid(event.Pid)
 			if image == "" {
@@ -184,7 +180,7 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 			} else {
 				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
 			}
-
+			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
 			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", event.Timestamp, tool)
 			eventHandler.ProcessConnectionMap[cacheKey] = true
 		}
