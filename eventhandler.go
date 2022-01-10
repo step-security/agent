@@ -215,7 +215,9 @@ func GetContainerIdByPid(cgroupPath string) string {
 		if len(parts) > 2 && parts[1] == "memory" {
 			containerIdParts := strings.Split(parts[2], "/")
 			if len(containerIdParts) == 3 {
-				return containerIdParts[2]
+				if containerIdParts[1] == "actions_job" {
+					return containerIdParts[2]
+				}
 			}
 		}
 	}
