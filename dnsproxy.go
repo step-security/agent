@@ -146,8 +146,24 @@ func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 	return nil, fmt.Errorf("unable to resolve domain %s", domain)
 }
 
+func getDomainFromCloudAppFormat(domain string) string {
+	domainParts := strings.Split(domain, ".")
+	totalDots := len(domainParts) - 6
+	finalDomain := ""
+	for i := 0; i < totalDots; i++ {
+		finalDomain += domainParts[i] + "."
+	}
+
+	return finalDomain
+}
+
 func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	domain = dns.Fqdn(domain)
+
+	if strings.HasSuffix(domain, ".internal.cloudapp.net.") {
+		domain = getDomainFromCloudAppFormat(domain)
+	}
+
 	cacheMsg, found := proxy.Cache.Get(domain)
 
 	if found {
@@ -155,7 +171,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	}
 
 	if proxy.EgressPolicy == EgressPolicyBlock {
-		if strings.HasSuffix(domain, ".internal.") || strings.HasSuffix(domain, ".internal.cloudapp.net.") {
+		if strings.HasSuffix(domain, ".internal.") {
 			go WriteLog(fmt.Sprintf("unable to resolve internal domains: %s", domain))
 			return "", fmt.Errorf("cannot resolve internal domains")
 		}
