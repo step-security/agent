@@ -121,6 +121,42 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 	eventHandler.procMutex.Unlock()
 }
 
+func printContainerInfo(pid, ppid string) {
+	WriteLog(fmt.Sprintf("printContainerInfo pid:%s, ppid:%s", pid, ppid))
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		//panic(err)
+	}
+
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		//panic(err)
+	}
+
+	for _, container := range containers {
+		json, _ := cli.ContainerInspect(ctx, container.ID)
+		WriteLog(fmt.Sprintf("printContainerInfo container:%s, pid:%d, containerid:%s", container.Image, json.State.Pid, container.ID))
+		for _, mp := range container.Mounts {
+			WriteLog(fmt.Sprintf("mount:%v", mp))
+		}
+	}
+
+	images, _ := cli.ImageList(ctx, types.ImageListOptions{All: true})
+	for _, image := range images {
+		WriteLog(fmt.Sprintf("image: %v", image))
+	}
+
+	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
+	content, err := ioutil.ReadFile(cgroupPath)
+	if err != nil {
+		WriteLog(fmt.Sprintf("cgroup not found %v", err))
+	} else {
+		WriteLog("cgroup content:")
+		WriteLog(string(content))
+	}
+}
+
 func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	eventHandler.netMutex.Lock()
 
@@ -134,6 +170,10 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 		_, found := eventHandler.ProcessConnectionMap[cacheKey]
 
 		if !found {
+			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
+			if strings.Contains(reverseLookUp, "dl-cdn.alpinelinux.") {
+				printContainerInfo(event.Pid, event.PPid)
+			}
 			tool := Tool{}
 			image := GetContainerByPid(event.Pid)
 			if image == "" {
@@ -145,7 +185,6 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
 			}
 
-			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
 			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", event.Timestamp, tool)
 			eventHandler.ProcessConnectionMap[cacheKey] = true
 		}
@@ -239,7 +278,7 @@ func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 }
 
 func isPrivateIPAddress(ipAddress string) bool {
-	
+
 	if ipAddress == AllZeros {
 		return true
 	}
