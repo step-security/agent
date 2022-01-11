@@ -206,8 +206,11 @@ func (eventHandler *EventHandler) HandleEvent(event *Event) {
 func GetContainerIdByPid(cgroupPath string) string {
 	content, err := ioutil.ReadFile(cgroupPath)
 	if err != nil {
+		WriteLog(fmt.Sprintf("error reading cgrouppath: %s : %v", cgroupPath, err))
 		return ""
 	}
+
+	WriteLog(fmt.Sprintf("content for cgrouppath: %s : %s", cgroupPath, content))
 
 	for _, line := range strings.Split(string(content), "\n") {
 		parts := strings.Split(line, ":")
