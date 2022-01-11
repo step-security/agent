@@ -174,7 +174,7 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 
 		if !found {
 			tool := Tool{}
-			image := GetContainerByPid(event.Pid)
+			image := eventHandler.GetContainerByPid(event.Pid)
 			if image == "" {
 				if event.Exe != "" {
 					tool = *eventHandler.GetToolChain(event.PPid, event.Exe)
@@ -206,8 +206,11 @@ func (eventHandler *EventHandler) HandleEvent(event *Event) {
 func GetContainerIdByPid(cgroupPath string) string {
 	content, err := ioutil.ReadFile(cgroupPath)
 	if err != nil {
+		WriteLog(fmt.Sprintf("error reading cgrouppath: %s : %v", cgroupPath, err))
 		return ""
 	}
+
+	WriteLog(fmt.Sprintf("content for cgrouppath: %s : %s", cgroupPath, content))
 
 	for _, line := range strings.Split(string(content), "\n") {
 		parts := strings.Split(line, ":")
@@ -218,13 +221,43 @@ func GetContainerIdByPid(cgroupPath string) string {
 					return containerIdParts[2]
 				}
 			}
+			if len(containerIdParts) > 3 {
+				if containerIdParts[1] == "docker" && containerIdParts[2] == "buildx" {
+					return containerIdParts[3]
+				}
+			}
 		}
 	}
 
 	return ""
 }
 
-func GetContainerByPid(pid string) string {
+func (eventHandler *EventHandler) SetContainerByPid(pid, container string) {
+	eventHandler.procMutex.Lock()
+
+	process, found := eventHandler.ProcessMap[pid]
+
+	if found {
+		process.Container = container
+	}
+
+	eventHandler.procMutex.Unlock()
+}
+
+func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
+	procContainer := ""
+
+	// see if already calculated
+	eventHandler.procMutex.Lock()
+	process, found := eventHandler.ProcessMap[pid]
+	if found {
+		if process.Container != "" {
+			eventHandler.procMutex.Unlock()
+			return process.Container
+		}
+	}
+	eventHandler.procMutex.Unlock()
+
 	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
 	containerId := GetContainerIdByPid(cgroupPath)
 	if containerId == "" {
@@ -233,6 +266,12 @@ func GetContainerByPid(pid string) string {
 		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
+	// docker prints first 12 characters in the log
+	if len(containerId) > 12 {
+		procContainer = containerId[:12]
+	}
+
+	// if container image found, use that
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -247,18 +286,15 @@ func GetContainerByPid(pid string) string {
 	for _, container := range containers {
 		json, _ := cli.ContainerInspect(ctx, container.ID)
 		if strings.Compare(pid, fmt.Sprintf("%d", json.State.Pid)) == 0 {
-			return container.Image
+			procContainer = container.Image
 		} else if containerId == container.ID {
 			WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", container.ID, pid))
-			return container.Image
+			procContainer = container.Image
 		}
 	}
 
-	// docker prints first 12 characters in the log
-	if len(containerId) > 12 {
-		return containerId[:12]
-	}
-	return containerId
+	eventHandler.SetContainerByPid(pid, procContainer)
+	return procContainer
 }
 
 func getProgramChecksum(path string) (string, error) {

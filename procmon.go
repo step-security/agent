@@ -27,6 +27,7 @@ type Process struct {
 	PID              string
 	PPid             string
 	Exe              string
+	Container        string // container that started this process
 	WorkingDirectory string
 	Arguments        []string
 	Scenario         string // npm publish, dotnet push are scenarios
