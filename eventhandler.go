@@ -266,6 +266,12 @@ func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
 		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
+	// docker prints first 12 characters in the log
+	if len(containerId) > 12 {
+		procContainer = containerId[:12]
+	}
+
+	// if container image found, use that
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -287,10 +293,6 @@ func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
 		}
 	}
 
-	// docker prints first 12 characters in the log
-	if len(containerId) > 12 {
-		procContainer = containerId[:12]
-	}
 	eventHandler.SetContainerByPid(pid, procContainer)
 	return procContainer
 }
