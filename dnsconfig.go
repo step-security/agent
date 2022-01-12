@@ -125,7 +125,7 @@ func (d *DnsConfig) SetDNSServer(cmd Command, resolvdConfigPath, tempDir string)
 
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error restarting systemd-resolved: %v", err))
+		return fmt.Errorf(fmt.Sprintf("error flushing cache: %v", err))
 	}
 
 	return nil
