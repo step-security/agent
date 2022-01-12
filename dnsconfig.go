@@ -117,6 +117,17 @@ func (d *DnsConfig) SetDNSServer(cmd Command, resolvdConfigPath, tempDir string)
 		return fmt.Errorf(fmt.Sprintf("error restarting systemd-resolved: %v", err))
 	}
 
+	// flush DNS cache
+	// https: //github.com/systemd/systemd/issues/940
+	if !mock {
+		cmd = exec.Command("/bin/sh", "-c", "sudo resolvectl flush-caches")
+	}
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("error flushing cache: %v", err))
+	}
+
 	return nil
 }
 
