@@ -1,6 +1,7 @@
 name: IntegrationTest
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - int
