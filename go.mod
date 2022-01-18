@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/coreos/go-iptables v0.6.0
 	github.com/elastic/go-libaudit/v2 v2.2.0
-	github.com/florianl/go-nflog/v2 v2.0.0
+	github.com/florianl/go-nflog/v2 v2.0.1
 	github.com/google/gopacket v1.1.19
 	github.com/jarcoal/httpmock v1.0.8
 	github.com/miekg/dns v1.1.43
@@ -21,6 +21,8 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/josharian/native v0.0.0-20200817173448-b6b71def0850 // indirect
+	github.com/mdlayher/socket v0.0.0-20210307095302-262dc9984e00 // indirect
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -35,7 +37,7 @@ require (
 require (
 	github.com/docker/docker v20.10.9+incompatible
 	github.com/google/go-cmp v0.5.6 // indirect
-	github.com/mdlayher/netlink v1.1.0 // indirect
-	golang.org/x/net v0.0.0-20210326060303-6b1517762897 // indirect
+	github.com/mdlayher/netlink v1.4.1 // indirect
+	golang.org/x/net v0.0.0-20210525063256-abc453219eb5 // indirect
 	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 // indirect
 )
