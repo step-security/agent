@@ -285,6 +285,10 @@ func RevertChanges(iptables *Firewall, nflog AgentNflogger,
 }
 
 func writeStatus(message string) error {
+	dir := "/home/agent"
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		_ = os.Mkdir(dir, 0644)
+	}
 	f, err := os.OpenFile("/home/agent/agent.status",
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 
@@ -299,6 +303,11 @@ func writeStatus(message string) error {
 }
 
 func writeDone() error {
+
+	dir := "/home/agent"
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		_ = os.Mkdir(dir, 0644)
+	}
 
 	f, err := os.OpenFile("/home/agent/done.json",
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
