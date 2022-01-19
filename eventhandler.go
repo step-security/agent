@@ -99,7 +99,9 @@ func isSyscallExcluded(syscall string) bool {
 func isSourceCodeFile(fileName string) bool {
 	ext := path.Ext(fileName)
 	// https://docs.github.com/en/get-started/learning-about-github/github-language-support
-	sourceCodeExtensions := []string{".c", "cpp", "cs", ".go", ".java", ".js", ".php", "py", ".rb", ".rs", ".scala", ".sc", ".sh", ".ts"}
+	// TODO: Add js & ts back. node makes change to js files as part of downloading/ setting up dependencies
+	// TODO: Add more extensions
+	sourceCodeExtensions := []string{".c", "cpp", "cs", ".go", ".java"}
 	for _, extension := range sourceCodeExtensions {
 		if ext == extension {
 			return true
@@ -121,6 +123,43 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 	eventHandler.procMutex.Unlock()
 }
 
+/*
+func printContainerInfo(pid, ppid string) {
+	WriteLog(fmt.Sprintf("printContainerInfo pid:%s, ppid:%s", pid, ppid))
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		//panic(err)
+	}
+
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		//panic(err)
+	}
+
+	for _, container := range containers {
+		json, _ := cli.ContainerInspect(ctx, container.ID)
+		WriteLog(fmt.Sprintf("printContainerInfo container:%s, pid:%d, containerid:%s", container.Image, json.State.Pid, container.ID))
+		for _, mp := range container.Mounts {
+			WriteLog(fmt.Sprintf("mount:%v", mp))
+		}
+	}
+
+	images, _ := cli.ImageList(ctx, types.ImageListOptions{All: true})
+	for _, image := range images {
+		WriteLog(fmt.Sprintf("image: %v", image))
+	}
+
+	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
+	content, err := ioutil.ReadFile(cgroupPath)
+	if err != nil {
+		WriteLog(fmt.Sprintf("cgroup not found %v", err))
+	} else {
+		WriteLog("cgroup content:")
+		WriteLog(string(content))
+	}
+}*/
+
 func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	eventHandler.netMutex.Lock()
 
@@ -135,7 +174,7 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 
 		if !found {
 			tool := Tool{}
-			image := GetContainerByPid(event.Pid)
+			image := eventHandler.GetContainerByPid(event.Pid)
 			if image == "" {
 				if event.Exe != "" {
 					tool = *eventHandler.GetToolChain(event.PPid, event.Exe)
@@ -144,7 +183,6 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 			} else {
 				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
 			}
-
 			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
 			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", event.Timestamp, tool)
 			eventHandler.ProcessConnectionMap[cacheKey] = true
@@ -165,31 +203,98 @@ func (eventHandler *EventHandler) HandleEvent(event *Event) {
 	}
 }
 
-func GetContainerByPid(pid string) string {
-	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
-	content, _ := ioutil.ReadFile(cgroupPath)
+func GetContainerIdByPid(cgroupPath string) string {
+	content, err := ioutil.ReadFile(cgroupPath)
+	if err != nil {
+		WriteLog(fmt.Sprintf("error reading cgrouppath: %s : %v", cgroupPath, err))
+		return ""
+	}
 
+	WriteLog(fmt.Sprintf("content for cgrouppath: %s : %s", cgroupPath, content))
+
+	for _, line := range strings.Split(string(content), "\n") {
+		parts := strings.Split(line, ":")
+		if len(parts) > 2 && parts[1] == "memory" {
+			containerIdParts := strings.Split(parts[2], "/")
+			if len(containerIdParts) > 2 {
+				if containerIdParts[1] == "actions_job" {
+					return containerIdParts[2]
+				}
+			}
+			if len(containerIdParts) > 3 {
+				if containerIdParts[1] == "docker" && containerIdParts[2] == "buildx" {
+					return containerIdParts[3]
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+func (eventHandler *EventHandler) SetContainerByPid(pid, container string) {
+	eventHandler.procMutex.Lock()
+
+	process, found := eventHandler.ProcessMap[pid]
+
+	if found {
+		process.Container = container
+	}
+
+	eventHandler.procMutex.Unlock()
+}
+
+func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
+	procContainer := ""
+
+	// see if already calculated
+	eventHandler.procMutex.Lock()
+	process, found := eventHandler.ProcessMap[pid]
+	if found {
+		if process.Container != "" {
+			eventHandler.procMutex.Unlock()
+			return process.Container
+		}
+	}
+	eventHandler.procMutex.Unlock()
+
+	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
+	containerId := GetContainerIdByPid(cgroupPath)
+	if containerId == "" {
+		return ""
+	} else {
+		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
+	}
+
+	// docker prints first 12 characters in the log
+	if len(containerId) > 12 {
+		procContainer = containerId[:12]
+	}
+
+	// if container image found, use that
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		//panic(err)
+		return ""
 	}
 
 	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
-		//panic(err)
+		return ""
 	}
 
 	for _, container := range containers {
 		json, _ := cli.ContainerInspect(ctx, container.ID)
 		if strings.Compare(pid, fmt.Sprintf("%d", json.State.Pid)) == 0 {
-			return container.Image
-		} else if strings.Contains(string(content), container.ID) {
-			return container.Image
+			procContainer = container.Image
+		} else if containerId == container.ID {
+			WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", container.ID, pid))
+			procContainer = container.Image
 		}
 	}
 
-	return ""
+	eventHandler.SetContainerByPid(pid, procContainer)
+	return procContainer
 }
 
 func getProgramChecksum(path string) (string, error) {
@@ -239,7 +344,7 @@ func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 }
 
 func isPrivateIPAddress(ipAddress string) bool {
-	
+
 	if ipAddress == AllZeros {
 		return true
 	}

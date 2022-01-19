@@ -157,3 +157,24 @@ func TestDNSProxy_auditCacheTTL(t *testing.T) {
 		t.Errorf("incorrect call count %d, expected 2, %v", count, info)
 	}
 }
+
+func Test_getDomainFromCloudAppFormat(t *testing.T) {
+	type args struct {
+		domain string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{name: "prod.cloudflare.com", args: args{domain: "production.cloudflare.docker.com.mma5zatft5wupo5mzspaixdheh.bx.internal.cloudapp.net."}, want: "production.cloudflare.docker.com."},
+		{name: "host.docker.internal", args: args{domain: "host.docker.internal.mma5zatft5wupo5mzspaixdheh.bx.internal.cloudapp.net."}, want: "host.docker.internal."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getDomainFromCloudAppFormat(tt.args.domain); got != tt.want {
+				t.Errorf("getDomainFromCloudAppFormat() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

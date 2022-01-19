@@ -146,8 +146,20 @@ func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 	return nil, fmt.Errorf("unable to resolve domain %s", domain)
 }
 
+func getDomainFromCloudAppFormat(domain string) string {
+	domainParts := strings.Split(domain, ".")
+	totalDots := len(domainParts) - 6
+	finalDomain := ""
+	for i := 0; i < totalDots; i++ {
+		finalDomain += domainParts[i] + "."
+	}
+
+	return finalDomain
+}
+
 func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	domain = dns.Fqdn(domain)
+
 	cacheMsg, found := proxy.Cache.Get(domain)
 
 	if found {
@@ -155,7 +167,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	}
 
 	if proxy.EgressPolicy == EgressPolicyBlock {
-		if strings.HasSuffix(domain, ".internal.") || strings.HasSuffix(domain, ".internal.cloudapp.net.") {
+		if strings.HasSuffix(domain, ".internal.") {
 			go WriteLog(fmt.Sprintf("unable to resolve internal domains: %s", domain))
 			return "", fmt.Errorf("cannot resolve internal domains")
 		}
@@ -206,6 +218,11 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt32, Data: "8.8.8.8"})
 
 		return &rr, nil
+	}
+
+	// Azure VM sometimes sends domain name with suffix of internal.cloudapp.net.
+	if strings.HasSuffix(q.Name, ".internal.cloudapp.net.") {
+		q.Name = getDomainFromCloudAppFormat(q.Name)
 	}
 
 	ip, err := proxy.getIPByDomain(q.Name)
