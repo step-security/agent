@@ -44,7 +44,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		WriteLog("post_event called")
 
 		// send done signal to post step
-		writeDone()
+		_ = writeDone()
 	}
 
 	_, found := eventHandler.ProcessFileMap[event.Pid]
