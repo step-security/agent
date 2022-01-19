@@ -2,13 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
-	"strings"
 	"testing"
 	"time"
 
@@ -169,9 +166,6 @@ func TestRun(t *testing.T) {
 		{name: "cmd failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommandWithError{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
-		{name: "cmd is nil", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
-			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: nil, resolvdConfigPath: createTempFileWithContents(""),
-			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
 
 		{name: "nflog failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNfloggerWithErr{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
@@ -215,49 +209,48 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func TestWriteDone(t *testing.T) {
-	folder := "/home/agent"
-	file := folder + "/done.json"
-	err := os.Mkdir(folder, 0666)
-	defer func() {
-		// cleanupp
-		os.RemoveAll(folder)
-	}()
-	if err != nil {
-		t.Errorf("unable to create folder: %s", folder)
+func Test_writeDone(t *testing.T) {
+	tests := []struct {
+		name    string
+		wantErr bool
+	}{
+		{name: "writing to done.json", wantErr: false},
 	}
-	writeDone()
-	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
-		t.Errorf("%s ; either doesn't exists or unable to write", file)
-	}
+	_, ciTest := os.LookupEnv("CI")
 
+	for _, tt := range tests {
+		if ciTest {
+			t.Run(tt.name, func(t *testing.T) {
+				if err := writeDone(); (err != nil) != tt.wantErr {
+					t.Errorf("writeDone() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			})
+		}
+
+	}
 }
 
-func TestWriteStatus(t *testing.T) {
-
-	folder := "/home/agent"
-	f := folder + "/agent.status"
-
-	err := os.Mkdir(folder, 0666)
-	defer func() {
-		// cleanup
-		os.RemoveAll(folder)
-	}()
-
-	if err != nil {
-		t.Errorf("unable to create %s folder", folder)
+func Test_writeStatus(t *testing.T) {
+	type args struct {
+		message string
 	}
-
-	testString := "this is test"
-	writeStatus(testString)
-
-	fileContent, err := ioutil.ReadFile(f)
-	if err != nil {
-		t.Errorf("%s while reading %s", errors.Unwrap(err), f)
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{name: "writing status", args: args{message: "this is test status"}, wantErr: false},
 	}
+	_, ciTest := os.LookupEnv("CI")
 
-	if strings.Compare(string(fileContent), testString) != 0 {
-		t.Errorf("file content mismatch")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if ciTest {
+				if err := writeStatus(tt.args.message); (err != nil) != tt.wantErr {
+					t.Errorf("writeStatus() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			}
+
+		})
 	}
-
 }
