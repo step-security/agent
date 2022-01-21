@@ -59,7 +59,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	config := &config{}
 	if err := config.init(configFilePath); err != nil {
-		_ = writeStatus(fmt.Sprintf("Error reading config file %v", err))
+		writeStatus(fmt.Sprintf("Error reading config file %v", err))
 		return err
 	}
 
@@ -183,7 +183,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	WriteLog("done")
 
 	// Write the status file
-	_ = writeStatus("Initialized")
+	writeStatus("Initialized")
 
 	for {
 		select {
