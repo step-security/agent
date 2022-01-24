@@ -6,15 +6,6 @@
 
 Purpose-built security agent for hosted runners
 
-To pilot it, add the following code to your GitHub Actions workflow file as the first step. This is the only step needed.
-
-```
-steps:
-    - uses: step-security/harden-runner@main
-```
-
-In the workflow logs, you should see a link to security insights and recommendations.
-
-It is being piloted on this repository. Check out the workflow files and workflow runs.
+This agent is used by the `harden-runner` GitHub Action. 
 
 
