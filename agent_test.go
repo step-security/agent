@@ -208,3 +208,50 @@ func TestRun(t *testing.T) {
 		}
 	}
 }
+
+func Test_writeDone(t *testing.T) {
+	tests := []struct {
+		name    string
+		wantErr bool
+	}{
+		{name: "writing to done.json", wantErr: false},
+	}
+	_, ciTest := os.LookupEnv("CI")
+	if ciTest {
+		for _, tt := range tests {
+
+			t.Run(tt.name, func(t *testing.T) {
+				if err := writeDone(); (err != nil) != tt.wantErr {
+					t.Errorf("writeDone() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			})
+		}
+
+	}
+}
+
+func Test_writeStatus(t *testing.T) {
+	type args struct {
+		message string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{name: "writing status", args: args{message: "this is test status"}, wantErr: false},
+	}
+	_, ciTest := os.LookupEnv("CI")
+	if ciTest {
+		for _, tt := range tests {
+
+			t.Run(tt.name, func(t *testing.T) {
+
+				if err := writeStatus(tt.args.message); (err != nil) != tt.wantErr {
+					t.Errorf("writeStatus() error = %v, wantErr %v", err, tt.wantErr)
+				}
+
+			})
+		}
+	}
+}
