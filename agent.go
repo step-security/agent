@@ -284,20 +284,41 @@ func RevertChanges(iptables *Firewall, nflog AgentNflogger,
 	WriteLog("Reverted changes")
 }
 
-func writeStatus(message string) {
-	f, _ := os.OpenFile("/home/agent/agent.status",
+func writeStatus(message string) error {
+	dir := "/home/agent"
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		_ = os.Mkdir(dir, 0644)
+	}
+	f, err := os.OpenFile("/home/agent/agent.status",
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 
+	if err != nil {
+		return err
+	}
 	defer f.Close()
 
 	f.WriteString(message)
+
+	return nil
 }
 
-func writeDone() {
-	f, _ := os.OpenFile("/home/agent/done.json",
+func writeDone() error {
+
+	dir := "/home/agent"
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		_ = os.Mkdir(dir, 0644)
+	}
+
+	f, err := os.OpenFile("/home/agent/done.json",
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	if err != nil {
+		return err
+	}
 
 	defer f.Close()
 
 	f.WriteString("done.json")
+
+	return nil
 }
