@@ -15,4 +15,5 @@
 # vendor/
 pkg/.DS_Store
 coverage.txt
+
 .vscode/
