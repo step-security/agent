@@ -166,7 +166,7 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	if !isPrivateIPAddress(event.IPAddress) &&
 		strings.Compare(event.IPAddress, "::1") != 0 &&
 		strings.Compare(event.IPAddress, AzureIPAddress) != 0 &&
-		strings.Compare(event.IPAddress, MetadataIPAddress) != 0 {
+		strings.Compare(event.IPAddress, MetadataIPAddress) != 0 && !isIPv6(event.IPAddress) {
 
 		cacheKey := fmt.Sprintf("%s%s%s", event.Pid, event.IPAddress, event.Port)
 
@@ -190,6 +190,10 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	}
 
 	eventHandler.netMutex.Unlock()
+}
+
+func isIPv6(ip string) bool {
+	return strings.Contains(ip, ":")
 }
 
 func (eventHandler *EventHandler) HandleEvent(event *Event) {
