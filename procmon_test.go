@@ -36,9 +36,19 @@ func TestProcessMonitor_PrepareEvent(t *testing.T) {
 	fileEventPart3 := make(map[string]interface{})
 	fileEventPart3["cwd"] = "/dir"
 
+	fileEventPart4 := make(map[string]interface{})
+	fileEventPart4["argc"] = "2"
+	fileEventPart4["a0"] = "argv1"
+	fileEventPart4["a1"] = "argv2"
+
+	fileEventPart5 := make(map[string]interface{})
+	fileEventPart5["argc"] = []string{"failed"}
+
 	processMonitor.PrepareEvent(2, fileEventPart1)
 	processMonitor.PrepareEvent(2, fileEventPart2)
 	processMonitor.PrepareEvent(2, fileEventPart3)
+	processMonitor.PrepareEvent(2, fileEventPart4)
+	processMonitor.PrepareEvent(2, fileEventPart5)
 
 	isReady = isEventReady(processMonitor.Events[2])
 
