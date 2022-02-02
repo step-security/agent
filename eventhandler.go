@@ -168,6 +168,8 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 		strings.Compare(event.IPAddress, AzureIPAddress) != 0 &&
 		strings.Compare(event.IPAddress, MetadataIPAddress) != 0 && !isIPv6(event.IPAddress) {
 
+		WriteLog(fmt.Sprintf("[Network-Event] IP: %s", event.IPAddress))
+
 		cacheKey := fmt.Sprintf("%s%s%s", event.Pid, event.IPAddress, event.Port)
 
 		_, found := eventHandler.ProcessConnectionMap[cacheKey]
