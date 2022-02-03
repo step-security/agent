@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"testing"
 )
 
@@ -15,13 +14,11 @@ func TestWriteAnnotation(t *testing.T) {
 	}{
 		{name: "writing_annotation", args: args{message: "annotation1"}},
 	}
-	_, ciTest := os.LookupEnv("CI")
-	if ciTest {
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				WriteAnnotation(tt.args.message)
-			})
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			WriteAnnotation(tt.args.message)
+		})
 	}
 
 }

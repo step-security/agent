@@ -3,7 +3,10 @@
 
 package main
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func Test_getProcessExe(t *testing.T) {
 	type args struct {
@@ -17,14 +20,18 @@ func Test_getProcessExe(t *testing.T) {
 		{name: "root_pid", args: args{pid: "1"}, wantErr: false},
 		{name: "unknown_pid", args: args{pid: "6666"}, wantErr: true},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := getProcessExe(tt.args.pid)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getProcessExe() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+	_, ciTest := os.LookupEnv("CI")
+	if ciTest {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				_, err := getProcessExe(tt.args.pid)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("getProcessExe() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
 
-		})
+			})
+		}
 	}
+
 }
