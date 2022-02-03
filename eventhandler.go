@@ -210,7 +210,7 @@ func GetContainerIdByPid(cgroupPath string) string {
 		return ""
 	}
 
-	WriteLog(fmt.Sprintf("content for cgrouppath: %s : %s", cgroupPath, content))
+	//WriteLog(fmt.Sprintf("content for cgrouppath: %s : %s", cgroupPath, content))
 
 	for _, line := range strings.Split(string(content), "\n") {
 		parts := strings.Split(line, ":")
