@@ -18,11 +18,10 @@ func WriteLog(message string) {
 
 	defer f.Close()
 	
+	//This is to prevent printing time for a newline
 	if message == "\n" {
-		
 		f.WriteString(fmt.Sprintf("\n"))
 	} else{
-		
 		f.WriteString(fmt.Sprintf("%s:%s\n", time.Now().String(), message))
 	}
 	
