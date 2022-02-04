@@ -36,9 +36,27 @@ func TestProcessMonitor_PrepareEvent(t *testing.T) {
 	fileEventPart3 := make(map[string]interface{})
 	fileEventPart3["cwd"] = "/dir"
 
+	// Testing procmon.go#93 [Process Start]
+	fileEventPart4 := make(map[string]interface{})
+	fileEventPart4["argc"] = "2"
+	fileEventPart4["a0"] = "argv1"
+	fileEventPart4["a1"] = "argv2"
+
+	// In procmon.go [Process Start] section,
+	// we are converting `argc` to INT.
+	// Because of below code, we will hit the error,
+	// in which we are unable to convert argc to INT.
+	// So, main intention was to cover that error handling block.
+	fileEventPart5 := make(map[string]interface{})
+	fileEventPart5["argc"] = []string{"failed"}
+	// ===== END =====
+
 	processMonitor.PrepareEvent(2, fileEventPart1)
 	processMonitor.PrepareEvent(2, fileEventPart2)
 	processMonitor.PrepareEvent(2, fileEventPart3)
+
+	processMonitor.PrepareEvent(2, fileEventPart4)
+	processMonitor.PrepareEvent(2, fileEventPart5)
 
 	isReady = isEventReady(processMonitor.Events[2])
 
