@@ -1,52 +1,53 @@
-name: Scorecard analysis workflow
-on:
+name: Scorecards supply-chain security
+on: 
+  workflow_dispatch:
   push:
-    # Only the default branch is supported.
-    branches: [main]
-  pull_request:
-    # All branches are supported.
-    branches: [main]
+    branches: [ main, master ]
 
+# Declare default permissions as read only.
 permissions: read-all
 
 jobs:
   analysis:
-    permissions:
-      actions: read # for ossf/scorecard-actions/analyze to check for publishing workflows
-      checks: read # for ossf/scorecard-actions/analyze to check for SAST tool in check runs
-      contents: read # for ossf/scorecard-actions/analyze to list releases
-      issues: read # for ossf/scorecard-actions/analyze to check if repo is maintained
-      pull-requests: read # for ossf/scorecard-actions/analyze to check if PRs are reviewed
-      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
-      statuses: read # for ossf/scorecard-actions/analyze to check for CI tests in PRs
-    name: Scorecard analysis
+    name: Scorecards analysis
     runs-on: ubuntu-latest
+    permissions:
+      # Needed to upload the results to code-scanning dashboard.
+      security-events: write
+      actions: read
+      contents: read
+    
     steps:
-      - uses: step-security/harden-runner@v1
-        with:
-          egress-policy: audit
-      
       - name: "Checkout code"
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.4.0
+        with:
+          persist-credentials: false
 
       - name: "Run analysis"
-        uses: ossf/scorecard-actions/analyze@7997b9913318433530164e97c418f0716ce9ab52
+        uses: ossf/scorecard-action@e3e75cf2ffbf9364bbff86cdbdf52b23176fe492 # v1.0.1
         with:
-          policy_file: .github/scorecard-policy.yml
           results_file: results.sarif
           results_format: sarif
+          # Read-only PAT token. To create it,
+          # follow the steps in https://github.com/ossf/scorecard-action#pat-token-creation.
           repo_token: ${{ secrets.GITHUB_TOKEN }}
+          # Publish the results for public repositories to enable scorecard badges. For more details, see
+          # https://github.com/ossf/scorecard-action#publishing-results. 
+          # For private repositories, `publish_results` will automatically be set to `false`, regardless 
+          # of the value entered here.
+          publish_results: true
 
-      # https://docs.github.com/en/actions/advanced-guides/storing-workflow-data-as-artifacts
-      # Optional.
+      # Upload the results as artifacts (optional). Commenting out will disable uploads of run results in SARIF
+      # format to the repository Actions tab.
       - name: "Upload artifact"
-        uses: actions/upload-artifact@b586475cdf29b524abab101a8ddb5efa9a225759
+        uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2.3.1
         with:
           name: SARIF file
           path: results.sarif
           retention-days: 5
-
-      - name: "Upload SARIF results"
-        uses: github/codeql-action/upload-sarif@5f532563584d71fdef14ee64d17bafb34f751ce5
+      
+      # Upload the results to GitHub's code scanning dashboard.
+      - name: "Upload to code-scanning"
+        uses: github/codeql-action/upload-sarif@5f532563584d71fdef14ee64d17bafb34f751ce5 # v1.0.26
         with:
           sarif_file: results.sarif
