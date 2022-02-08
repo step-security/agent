@@ -22,7 +22,8 @@ func WriteLog(message string) {
 	if message == "\n" {
 		f.WriteString(fmt.Sprintf("\n"))
 	} else{
-		f.WriteString(fmt.Sprintf("%s:%s\n", time.Now().Format("Mon, 02 Jan 2006 15:04:05 MST"), message))
+		location, _ := time.LoadLocation("Etc/GMT")
+		f.WriteString(fmt.Sprintf("%s:%s\n", time.Now().In(location).Format("Mon, 02 Jan 2006 15:04:05 MST"), message))
 	}
 	
 
