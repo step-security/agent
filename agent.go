@@ -63,7 +63,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL}
+	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL, SendInsights: config.SendInsights}
 
 	// TODO: pass in an iowriter/ use log library
 	WriteLog(fmt.Sprintf("read config %v", config))
@@ -72,7 +72,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	Cache := InitCache(config.EgressPolicy)
 
-	allowedEndpoints := addImplicitEndpoints(config.Endpoints)
+	allowedEndpoints := addImplicitEndpoints(config.Endpoints, config.SendInsights)
 
 	// Start DNS servers and get confirmation
 	dnsProxy := DNSProxy{
@@ -249,9 +249,9 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 
 }
 
-func addImplicitEndpoints(endpoints map[string][]Endpoint) map[string][]Endpoint {
+func addImplicitEndpoints(endpoints map[string][]Endpoint, insights bool) map[string][]Endpoint {
 	implicitEndpoints := []Endpoint{
-		{domainName: "agent.api.stepsecurity.io", port: 443},                   // Should be implicit based on user feedback
+
 		{domainName: "pipelines.actions.githubusercontent.com", port: 443},     // GitHub
 		{domainName: "artifactcache.actions.githubusercontent.com", port: 443}, // GitHub
 		{domainName: "codeload.github.com", port: 443},                         // GitHub
@@ -262,6 +262,12 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint) map[string][]Endpoint
 
 	for _, endpoint := range implicitEndpoints {
 		endpoints[endpoint.domainName] = append(endpoints[endpoint.domainName], endpoint)
+	}
+
+	stepsecurity := Endpoint{domainName: "agent.api.stepsecurity.io", port: 443} // Should be implicit based on user feedback
+	if insights {
+		// allowing only if send_insights is set to true
+		endpoints[stepsecurity.domainName] = append(endpoints[stepsecurity.domainName], stepsecurity)
 	}
 
 	return endpoints

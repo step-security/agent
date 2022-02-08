@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -36,52 +37,65 @@ type NetworkConnection struct {
 }
 
 type ApiClient struct {
-	Client *http.Client
-	APIURL string
+	Client       *http.Client
+	APIURL       string
+	SendInsights bool
 }
 
 const agentApiBaseUrl = "https://apiurl/v1"
+const insightsBlocked = "insights are blocked from sending"
 
 func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAddress string) error {
 
-	dnsRecord := &DNSRecord{}
+	if apiclient.SendInsights {
+		dnsRecord := &DNSRecord{}
 
-	dnsRecord.DomainName = domainName
-	dnsRecord.ResolvedIPAddress = ipAddress
-	dnsRecord.TimeStamp = time.Now().UTC()
+		dnsRecord.DomainName = domainName
+		dnsRecord.ResolvedIPAddress = ipAddress
+		dnsRecord.TimeStamp = time.Now().UTC()
 
-	url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/dns", apiclient.APIURL, repo, correlationId)
+		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/dns", apiclient.APIURL, repo, correlationId)
 
-	return apiclient.sendApiRequest("POST", url, dnsRecord)
+		return apiclient.sendApiRequest("POST", url, dnsRecord)
+	}
+	return nil
 }
 
 func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, port, domainName, status string, timestamp time.Time, tool Tool) error {
 
-	networkConnection := &NetworkConnection{}
+	if apiclient.SendInsights {
+		networkConnection := &NetworkConnection{}
 
-	networkConnection.IPAddress = ipAddress
-	networkConnection.Port = port
-	networkConnection.DomainName = domainName
-	networkConnection.Status = status
-	networkConnection.TimeStamp = timestamp
-	networkConnection.Tool = tool
+		networkConnection.IPAddress = ipAddress
+		networkConnection.Port = port
+		networkConnection.DomainName = domainName
+		networkConnection.Status = status
+		networkConnection.TimeStamp = timestamp
+		networkConnection.Tool = tool
 
-	url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/networkconnection", apiclient.APIURL, repo, correlationId)
+		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/networkconnection", apiclient.APIURL, repo, correlationId)
 
-	return apiclient.sendApiRequest("POST", url, networkConnection)
+		return apiclient.sendApiRequest("POST", url, networkConnection)
+	}
+	return nil
+
 }
 
 func (apiclient *ApiClient) sendFileEvent(correlationId, repo, fileType string, timestamp time.Time, tool Tool) error {
 
-	fileEvent := &FileEvent{}
+	if apiclient.SendInsights {
+		fileEvent := &FileEvent{}
 
-	fileEvent.FileType = fileType
-	fileEvent.TimeStamp = timestamp
-	fileEvent.Tool = tool
+		fileEvent.FileType = fileType
+		fileEvent.TimeStamp = timestamp
+		fileEvent.Tool = tool
 
-	url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/fileevent", apiclient.APIURL, repo, correlationId)
+		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/fileevent", apiclient.APIURL, repo, correlationId)
 
-	return apiclient.sendApiRequest("POST", url, fileEvent)
+		return apiclient.sendApiRequest("POST", url, fileEvent)
+	}
+	return nil
+
 }
 
 /*func (apiclient *ApiClient) sendArtifact(correlationId, repo string, artifact artifact.Artifact) error {
