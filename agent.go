@@ -66,9 +66,11 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL}
 
 	// TODO: pass in an iowriter/ use log library
-	WriteLog(fmt.Sprintf("read config %v", config))
+	WriteLog(fmt.Sprintf("read config \n %v", config))
+	WriteLog("\n")
 
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
+	WriteLog("\n")
 
 	Cache := InitCache(config.EgressPolicy)
 
@@ -125,6 +127,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
+	WriteLog("\n")
 	WriteLog("updated resolved")
 
 	// Change DNS for docker, causes process in containers to use agent's DNS proxy
@@ -134,7 +137,8 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	WriteLog("set docker config")
+	WriteLog("\n")
+	WriteLog("set docker config\n")
 
 	if config.EgressPolicy == EgressPolicyAudit {
 		netMonitor := NetworkMonitor{
@@ -159,7 +163,9 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		WriteLog("added audit rules")
 	} else if config.EgressPolicy == EgressPolicyBlock {
 
+		WriteLog("\n")
 		WriteLog(fmt.Sprintf("Allowed domains:%v", config.Endpoints))
+		WriteLog("\n")
 
 		netMonitor := NetworkMonitor{
 			CorrelationId: config.CorrelationId,
@@ -206,6 +212,7 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				WriteLog("\n")
 				WriteLog("Refreshing DNS entries")
 				for domainName, endpoints := range allowedEndpoints {
 					element, found := dnsProxy.Cache.Get(domainName)

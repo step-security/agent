@@ -17,6 +17,7 @@ import (
 )
 
 func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
+	WriteLog("\n")
 	WriteLog("Monitor Processes called")
 
 	client, err := libaudit.NewAuditClient(nil)
@@ -104,6 +105,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	}
 
 	WriteLog("receive called")
+	WriteLog("\n")
 
 	p.receive(client)
 }

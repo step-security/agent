@@ -22,7 +22,7 @@ func WriteLog(message string) {
 	if message == "\n" {
 		f.WriteString(fmt.Sprintf("\n"))
 	} else{
-		f.WriteString(fmt.Sprintf("%s:%s\n", time.Now().String(), message))
+		f.WriteString(fmt.Sprintf("%s:%s\n", time.Now().Format("Mon, 02 Jan 2006 15:04:05 MST"), message))
 	}
 	
 
