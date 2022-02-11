@@ -63,7 +63,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy}
+	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL, DisableTelemetry: config.DisableTelemetry}
 
 	// TODO: pass in an iowriter/ use log library
 	WriteLog(fmt.Sprintf("read config %v", config))
