@@ -63,7 +63,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL, SendInsights: config.SendInsights}
+	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy}
 
 	// TODO: pass in an iowriter/ use log library
 	WriteLog(fmt.Sprintf("read config %v", config))
@@ -72,7 +72,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	Cache := InitCache(config.EgressPolicy)
 
-	allowedEndpoints := addImplicitEndpoints(config.Endpoints, config.SendInsights)
+	allowedEndpoints := addImplicitEndpoints(config.Endpoints, config.DisableTelemetry)
 
 	// Start DNS servers and get confirmation
 	dnsProxy := DNSProxy{
@@ -249,7 +249,7 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 
 }
 
-func addImplicitEndpoints(endpoints map[string][]Endpoint, insights bool) map[string][]Endpoint {
+func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool) map[string][]Endpoint {
 	implicitEndpoints := []Endpoint{
 
 		{domainName: "pipelines.actions.githubusercontent.com", port: 443},     // GitHub
@@ -265,8 +265,8 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, insights bool) map[st
 	}
 
 	stepsecurity := Endpoint{domainName: "agent.api.stepsecurity.io", port: 443} // Should be implicit based on user feedback
-	if insights {
-		// allowing only if send_insights is set to true
+	if !disableTelemetry {
+		// allowing only if disable_telemetry is set to false
 		endpoints[stepsecurity.domainName] = append(endpoints[stepsecurity.domainName], stepsecurity)
 	}
 

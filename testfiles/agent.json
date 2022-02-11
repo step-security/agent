@@ -5,5 +5,5 @@
   "api_url": "https://apiurl/v1",
   "allowed_endpoints": "",
   "egress_policy": "audit",
-  "send_insights": true
+  "disable_telemetry": false
 }
