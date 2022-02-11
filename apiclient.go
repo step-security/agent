@@ -39,13 +39,14 @@ type ApiClient struct {
 	Client           *http.Client
 	APIURL           string
 	DisableTelemetry bool
+	EgressPolicy     string
 }
 
 const agentApiBaseUrl = "https://apiurl/v1"
 
 func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAddress string) error {
 
-	if !apiclient.DisableTelemetry {
+	if !apiclient.DisableTelemetry || apiclient.EgressPolicy == EgressPolicyAudit {
 		dnsRecord := &DNSRecord{}
 
 		dnsRecord.DomainName = domainName
@@ -61,7 +62,7 @@ func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAdd
 
 func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, port, domainName, status string, timestamp time.Time, tool Tool) error {
 
-	if !apiclient.DisableTelemetry {
+	if !apiclient.DisableTelemetry || apiclient.EgressPolicy == EgressPolicyAudit {
 		networkConnection := &NetworkConnection{}
 
 		networkConnection.IPAddress = ipAddress
@@ -81,7 +82,7 @@ func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, po
 
 func (apiclient *ApiClient) sendFileEvent(correlationId, repo, fileType string, timestamp time.Time, tool Tool) error {
 
-	if !apiclient.DisableTelemetry {
+	if !apiclient.DisableTelemetry || apiclient.EgressPolicy == EgressPolicyAudit {
 		fileEvent := &FileEvent{}
 
 		fileEvent.FileType = fileType
