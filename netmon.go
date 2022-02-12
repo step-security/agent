@@ -99,7 +99,7 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 					go WriteLog(fmt.Sprintf("ip address dropped: %s", ipv4Address))
 
 					if ipv4Address != StepSecuritySinkHoleIPAddress { // Sinkhole IP address will be covered by DNS block
-						go WriteAnnotation(fmt.Sprintf("Traffic to IP Address %s was blocked", ipv4Address))
+						go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Traffic to IP Address %s was blocked", ipv4Address))
 					}
 				}
 			}
