@@ -174,7 +174,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 		if !proxy.isAllowedDomain(domain) {
 			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
-			go WriteAnnotation(fmt.Sprintf("DNS resolution for domain %s was blocked", domain))
+			go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: DNS resolution for domain %s was blocked. This domain is not in the list of allowed-endpoints.", domain))
 
 			// return an ip address, so calling process calls the ip address
 			// the call will be blocked by the firewall

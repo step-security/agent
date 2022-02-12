@@ -63,16 +63,18 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL}
+	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy}
 
 	// TODO: pass in an iowriter/ use log library
-	WriteLog(fmt.Sprintf("read config %v", config))
+	WriteLog(fmt.Sprintf("read config \n %v", config))
+	WriteLog("\n")
 
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
+	WriteLog("\n")
 
 	Cache := InitCache(config.EgressPolicy)
 
-	allowedEndpoints := addImplicitEndpoints(config.Endpoints)
+	allowedEndpoints := addImplicitEndpoints(config.Endpoints, config.DisableTelemetry)
 
 	// Start DNS servers and get confirmation
 	dnsProxy := DNSProxy{
@@ -125,6 +127,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
+	WriteLog("\n")
 	WriteLog("updated resolved")
 
 	// Change DNS for docker, causes process in containers to use agent's DNS proxy
@@ -134,7 +137,8 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	WriteLog("set docker config")
+	WriteLog("\n")
+	WriteLog("set docker config\n")
 
 	if config.EgressPolicy == EgressPolicyAudit {
 		netMonitor := NetworkMonitor{
@@ -159,7 +163,9 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		WriteLog("added audit rules")
 	} else if config.EgressPolicy == EgressPolicyBlock {
 
+		WriteLog("\n")
 		WriteLog(fmt.Sprintf("Allowed domains:%v", config.Endpoints))
+		WriteLog("\n")
 
 		netMonitor := NetworkMonitor{
 			CorrelationId: config.CorrelationId,
@@ -206,6 +212,7 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				WriteLog("\n")
 				WriteLog("Refreshing DNS entries")
 				for domainName, endpoints := range allowedEndpoints {
 					element, found := dnsProxy.Cache.Get(domainName)
@@ -249,9 +256,9 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 
 }
 
-func addImplicitEndpoints(endpoints map[string][]Endpoint) map[string][]Endpoint {
+func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool) map[string][]Endpoint {
 	implicitEndpoints := []Endpoint{
-		{domainName: "agent.api.stepsecurity.io", port: 443},                   // Should be implicit based on user feedback
+
 		{domainName: "pipelines.actions.githubusercontent.com", port: 443},     // GitHub
 		{domainName: "artifactcache.actions.githubusercontent.com", port: 443}, // GitHub
 		{domainName: "codeload.github.com", port: 443},                         // GitHub
@@ -262,6 +269,12 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint) map[string][]Endpoint
 
 	for _, endpoint := range implicitEndpoints {
 		endpoints[endpoint.domainName] = append(endpoints[endpoint.domainName], endpoint)
+	}
+
+	stepsecurity := Endpoint{domainName: "agent.api.stepsecurity.io", port: 443} // Should be implicit based on user feedback
+	if !disableTelemetry {
+		// allowing only if disable_telemetry is set to false
+		endpoints[stepsecurity.domainName] = append(endpoints[stepsecurity.domainName], stepsecurity)
 	}
 
 	return endpoints
