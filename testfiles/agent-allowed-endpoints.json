@@ -4,5 +4,6 @@
   "correlation_id": "d942cc6c-d349-49da-ad54-a1bf92538567",
   "api_url": "https://apiurl/v1",
   "allowed_endpoints": "domain1.com:443 domain2.com:443",
-  "egress_policy": "block"
+  "egress_policy": "block",
+  "disable_telemetry": true
 }

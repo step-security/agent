@@ -18,6 +18,7 @@ type config struct {
 	APIURL           string
 	Endpoints        map[string][]Endpoint
 	EgressPolicy     string
+	DisableTelemetry bool
 }
 
 type Endpoint struct {
@@ -33,6 +34,7 @@ type configFile struct {
 	APIURL           string `json:"api_url"`
 	AllowedEndpoints string `json:"allowed_endpoints"`
 	EgressPolicy     string `json:"egress_policy"`
+	DisableTelemetry bool   `json:"disable_telemetry"`
 }
 
 // init reads the config file for the agent and initializes config settings
@@ -55,6 +57,7 @@ func (c *config) init(configFilePath string) error {
 	c.APIURL = configFile.APIURL
 	c.Endpoints = parseEndpoints(configFile.AllowedEndpoints)
 	c.EgressPolicy = configFile.EgressPolicy
+	c.DisableTelemetry = configFile.DisableTelemetry
 	return nil
 }
 
