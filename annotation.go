@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -11,6 +12,10 @@ var annotationMutex sync.Mutex
 func WriteAnnotation(message string) {
 	annotationMutex.Lock()
 	defer annotationMutex.Unlock()
+
+	if strings.Contains(message, "api.snapcraft.io") {
+		return
+	}
 
 	dir := "/home/agent"
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
