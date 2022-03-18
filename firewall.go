@@ -228,11 +228,10 @@ func AddAuditRules(firewall *Firewall) error {
 	}
 
 	// deny DNS on port 53
-	// TODO: Deny UDP overall?
-	//err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "--dport", "53", "-j", "DROP")
-	err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "-j", "DROP")
+	err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "--dport", "53", "-j", "DROP")
+	// err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "-j", "DROP")
 	if err != nil {
-		return errors.Wrap(err, "failed to deny udp")
+		return errors.Wrap(err, "failed to deny udp:53")
 	}
 
 	// this limits the number of packets sent to nflog. Only SYN requests are sent
@@ -248,10 +247,11 @@ func AddAuditRules(firewall *Firewall) error {
 		return fmt.Errorf(fmt.Sprintf("ClearChain failed for DOCKER-USER: %v", err))
 	}
 
-	err = ipt.Append("filter", "DOCKER-USER", "-i", "docker0", "-p", "udp", "-j", "DROP")
+	// err = ipt.Append("filter", "DOCKER-USER", "-i", "docker0", "-p", "udp", "-j", "DROP")
+	err = ipt.Append("filter", "DOCKER_USER", "-i", "docker0", "-p", "udp", "--dport", "53", "-j", "DROP")
 
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("failed to deny udp docker interface: %v", err))
+		return fmt.Errorf(fmt.Sprintf("failed to deny udp:53 docker interface: %v", err))
 	}
 
 	err = ipt.Append("filter", "DOCKER-USER", "-i", "docker0", "-p", "tcp", "--tcp-flags", "SYN,ACK", "SYN", "-j", "NFLOG", "--nflog-group", "100")
