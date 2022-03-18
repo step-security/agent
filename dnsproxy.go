@@ -174,7 +174,13 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 		if !proxy.isAllowedDomain(domain) {
 			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
-			go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: DNS resolution for domain %s was blocked. This domain is not in the list of allowed-endpoints.", domain))
+
+			// call to api.snapcraft.io is made by snapd in GITHUB_RUNNER
+			// so if it's not present in allowed-domains, traffic to it will get blocked
+			// since it is called by default service, we don't need to add it to annotations
+			if !strings.Contains(domain, "api.snapcraft.io") {
+				go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: DNS resolution for domain %s was blocked. This domain is not in the list of allowed-endpoints.", domain))
+			}
 
 			// return an ip address, so calling process calls the ip address
 			// the call will be blocked by the firewall
