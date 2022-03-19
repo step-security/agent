@@ -122,8 +122,12 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
 		
 		WriteLog("Arguments:")
-		for _, value := range event.ProcessArguments {
-			WriteLog(value)
+		for idx, value := range event.ProcessArguments {
+			if value == "npm"{
+				WriteLog(value)
+				WriteLog(event.ProcessArguments[idx+1])
+			}
+			
 		}
 	}
 
