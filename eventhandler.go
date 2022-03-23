@@ -43,7 +43,6 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	if strings.Contains(event.FileName, "post_event.json") {
 		WriteLog("\n")
 		WriteLog("post_event called")
-		WriteLog("arjundashrath/agent works")
 
 		// send done signal to post step
 		writeDone()
@@ -120,15 +119,14 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
-		
-		
+
 		for idx, value := range event.ProcessArguments {
-			if value == "npm"{
+			if value == "docker" {
 				WriteLog("Arguments:")
 				WriteLog(value)
 				WriteLog(event.ProcessArguments[idx+1])
 			}
-			
+
 		}
 	}
 
