@@ -122,7 +122,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 		for idx, value := range event.ProcessArguments {
 			
-			arg := idx +" (+) " + value
+			arg := idx +"(+)" + value
 			
 			WriteLog(arg)
 			if value == "docker" {
