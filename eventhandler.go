@@ -121,8 +121,12 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
 
 		for idx, value := range event.ProcessArguments {
+			
+			arg := idx +" (+) " + value
+			
+			WriteLog(arg)
 			if value == "docker" {
-				WriteLog("Arguments:")
+				WriteLog("Special Arguments:")
 				WriteLog(value)
 				WriteLog(event.ProcessArguments[idx+1])
 			}
