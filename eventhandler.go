@@ -129,7 +129,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 			if value == "docker" {
 				WriteLog("Special Arguments:")
 				WriteLog(value)
-				WriteLog(event.ProcessArguments[idx+1])
+				//WriteLog(event.ProcessArguments[idx+1])
 			}
 
 		}
