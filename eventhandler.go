@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"strconv"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -122,7 +123,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 		for idx, value := range event.ProcessArguments {
 			
-			arg := idx +"(+)" + value
+			arg := strconv.Itoa(idx) +" (+) " + value
 			
 			WriteLog(arg)
 			if value == "docker" {
