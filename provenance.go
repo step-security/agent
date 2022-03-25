@@ -129,7 +129,7 @@ func provgen() Statement {
 	gh := context.GitHubContext
 
 	// NOTE: Re-runs are not uniquely identified and can cause run ID collisions.
-	repourl := "https://github.com/" + gh.Repository
+	repourl := "https://github.com/" + process.env["GITHUB_REPOSITORY"]
 
 	stm.Predicate.Builder.Id = repourl
 
