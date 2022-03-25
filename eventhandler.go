@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"strconv"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -121,14 +121,16 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
 
-		for idx, value := range event.ProcessArguments {
-			
-			arg := strconv.Itoa(idx) +" (+) " + value
-			
-			WriteLog(arg)
+		for _, value := range event.ProcessArguments {
+
 			if value == "docker" {
-				WriteLog("Special Arguments:")
-				WriteLog(value)
+
+				provdump := provgen()
+
+				payload, _ := json.MarshalIndent(provdump, "", "  ")
+
+				WriteLog(string(payload))
+
 				//WriteLog(event.ProcessArguments[idx+1])
 			}
 
