@@ -7,8 +7,6 @@ import (
 )
 
 var (
-	artifactPath  = flag.String("artifact_path", "", "The file or dir path of the artifacts for which provenance should be generated.")
-	outputPath    = flag.String("output_path", "build.provenance", "The path to which the generated provenance should be written.")
 	githubContext = flag.String("github_context", "", "The '${github}' context value.")
 	runnerContext = flag.String("runner_context", "", "The '${runner}' context value.")
 )
@@ -125,11 +123,17 @@ func provgen() Statement {
 	}
 
 	context := AnyContext{}
+	/*if err := json.Unmarshal([]byte(*githubContext), &context.GitHubContext); err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal([]byte(*runnerContext), &context.RunnerContext); err != nil {
+		panic(err)
+	}*/
 
 	gh := context.GitHubContext
 
 	// NOTE: Re-runs are not uniquely identified and can cause run ID collisions.
-	repourl := "https://github.com/" + process.env["GITHUB_REPOSITORY"]
+	repourl := "https://github.com/" + gh.Repository
 
 	stm.Predicate.Builder.Id = repourl
 
