@@ -121,17 +121,35 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
 
-		for _, value := range event.ProcessArguments {
+		for idx, value := range event.ProcessArguments {
 
-			if value == "docker" {
+			if value == "docker" && len(event.ProcessArguments) >= 2 {
 
-				provdump := provgen()
+				if event.ProcessArguments[idx+1] == "build" {
 
-				payload, _ := json.MarshalIndent(provdump, "", "  ")
+					cli, err := client.NewClientWithOpts(client.FromEnv)
+					if err != nil {
+						panic(err)
+					}
 
-				WriteLog(string(payload))
+					containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+					if err != nil {
+						panic(err)
+					}
 
-				//WriteLog(event.ProcessArguments[idx+1])
+					for _, container := range containers {
+						WriteLog(container.ID[:10])
+						WriteLog(container.Image)
+						//fmt.Printf("%s %s\n", container.ID[:10], container.Image)
+					}
+
+					provdump := provgen()
+
+					payload, _ := json.MarshalIndent(provdump, "", "  ")
+
+					WriteLog(string(payload))
+				}
+
 			}
 
 		}
