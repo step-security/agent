@@ -98,7 +98,7 @@ type Completeness struct {
 	Materials   bool `json:"materials"`
 }
 
-func provgen() Statement {
+func provgen(args []string) Statement {
 
 	stm := Statement{PredicateType: "https://slsa.dev/provenance/v0.1", Type: "https://in-toto.io/Statement/v0.1"}
 	//stm.Subject = append(stmt.Subject, generateSubject...)
