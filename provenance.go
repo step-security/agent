@@ -12,8 +12,6 @@ var (
 )
 
 const (
-	GitHubHostedIdSuffix = "/Attestations/GitHubHostedActions@v1"
-	SelfHostedIdSuffix   = "/Attestations/SelfHostedActions@v1"
 	TypeId               = "https://github.com/Attestations/arjundashrath/harden-runner@v1"
 	PayloadContentType   = "application/vnd.in-toto+json"
 )
@@ -123,6 +121,7 @@ func provgen() Statement {
 	}
 
 	context := AnyContext{}
+	//TODO THROWS ERROR
 	/*if err := json.Unmarshal([]byte(*githubContext), &context.GitHubContext); err != nil {
 		panic(err)
 	}
@@ -138,6 +137,19 @@ func provgen() Statement {
 	stm.Predicate.Builder.Id = repourl
 
 	stm.Predicate.Metadata.BuildInvocationId = repourl + "/actions/runs/" + gh.RunId
+	
+	stm.Predicate.Recipe.Type = "docker build"
+
+	stm.Predicate.Recipe.DefinedInMaterial = repourl + "/main/blob/Dockerfile"
+	//Path can be taken from core input in case of buildx action
+	
+	argstr := ""
+
+	for _, value := range args {
+		argstr = argstr + value
+	}
+
+	stm.Predicate.Recipe.Arguments = json.RawMessage(argstr)
 
 	return stm
 }
