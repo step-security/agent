@@ -146,7 +146,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 						WriteLog(fmt.Sprintf("%s %s\n", container.ID[:10], container.Image))
 						
 					}
-					images, _ := cli.ImageList(ctx, types.ImageListOptions{All: true})
+					images, _ := cli.ImageList(context.Background(), types.ImageListOptions{All: true})
 					for _, image := range images {
 						WriteLog("Writing images")
 						WriteLog(fmt.Sprintf("image: %v", image))
