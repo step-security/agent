@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -127,6 +128,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 				if event.ProcessArguments[idx+1] == "build" {
 					
+					time.Sleep(10 * time.Second)
 					WriteLog("\n")
 					cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 					if err != nil {
