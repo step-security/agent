@@ -155,7 +155,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 						WriteLog(fmt.Sprintf("image: %v", image))
 					}
 
-					provdump := provgen()
+					provdump := provgen(event.ProcessArguments)
 
 					payload, _ := json.MarshalIndent(provdump, "", "  ")
 
