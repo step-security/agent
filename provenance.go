@@ -140,7 +140,9 @@ func provgen(args []string) Statement {
 	
 	stm.Predicate.Recipe.Type = "docker build"
 
-	stm.Predicate.Recipe.DefinedInMaterial = repourl + "/main/blob/Dockerfile"
+	stm.Predicate.Recipe.DefinedInMaterial = 0
+
+	stm.Predicate.Materials[0].URI = repourl + "/main/blob/Dockerfile"
 	//Path can be taken from core input in case of buildx action
 	
 	argstr := ""
