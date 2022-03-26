@@ -127,20 +127,29 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 				if event.ProcessArguments[idx+1] == "build" {
 
-					cli, err := client.NewClientWithOpts(client.FromEnv)
+					cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 					if err != nil {
 						panic(err)
+						WriteLog("ERROR AT NEWCLIENTWITHOPTS")
 					}
 
 					containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
 					if err != nil {
 						panic(err)
+						WriteLog("ERROR AT CONTAINERS")
 					}
 
 					for _, container := range containers {
+						WriteLog("Writing containers")
 						WriteLog(container.ID[:10])
 						WriteLog(container.Image)
-						//fmt.Printf("%s %s\n", container.ID[:10], container.Image)
+						WriteLog(fmt.Sprintf("%s %s\n", container.ID[:10], container.Image))
+						
+					}
+					images, _ := cli.ImageList(ctx, types.ImageListOptions{All: true})
+					for _, image := range images {
+						WriteLog("Writing images")
+						WriteLog(fmt.Sprintf("image: %v", image))
 					}
 
 					provdump := provgen()
