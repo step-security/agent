@@ -123,7 +123,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 		for idx, value := range event.ProcessArguments {
 
-			if value == "docker" && len(event.ProcessArguments) >= 2 {
+			if value == "docker" && len(event.ProcessArguments) >= 2 && idx < len(event.ProcessArguments) - 1 {
 
 				if event.ProcessArguments[idx+1] == "build" {
 
