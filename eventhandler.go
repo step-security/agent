@@ -128,7 +128,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 				if event.ProcessArguments[idx+1] == "build" {
 					
-					time.Sleep(10 * time.Second)
+					time.Sleep(30 * time.Second)
 					WriteLog("\n")
 					cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 					if err != nil {
