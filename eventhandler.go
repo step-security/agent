@@ -122,11 +122,12 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
 
 		for idx, value := range event.ProcessArguments {
-
+			WriteLog(value)
 			if value == "docker" && len(event.ProcessArguments) >= 2 && idx < len(event.ProcessArguments) - 1 {
 
 				if event.ProcessArguments[idx+1] == "build" {
-
+					
+					WriteLog("\n")
 					cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 					if err != nil {
 						panic(err)
