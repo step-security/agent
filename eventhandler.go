@@ -81,7 +81,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 
 			if isFromDifferentProcess {
 				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
-				WriteAnnotation(fmt.Sprintf("Source code overwritten %s syscall: %s by %s", event.FileName, event.Syscall, event.Exe))
+				WriteAnnotation(fmt.Sprintf("StepSecurity: Source code overwritten %s syscall: %s by %s", event.FileName, event.Syscall, event.Exe))
 			}
 		}
 	}
