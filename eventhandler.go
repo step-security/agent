@@ -102,7 +102,7 @@ func isSourceCodeFile(fileName string) bool {
 	// https://docs.github.com/en/get-started/learning-about-github/github-language-support
 	// TODO: Add js & ts back. node makes change to js files as part of downloading/ setting up dependencies
 	// TODO: Add more extensions
-	sourceCodeExtensions := []string{".c", "cpp", "cs", ".go", ".java"}
+	sourceCodeExtensions := []string{".c", ".cpp", ".cs", ".go", ".java"}
 	for _, extension := range sourceCodeExtensions {
 		if ext == extension {
 			return true
