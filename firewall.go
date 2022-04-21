@@ -227,10 +227,11 @@ func AddAuditRules(firewall *Firewall) error {
 		ipt = firewall.IPTables
 	}
 
-	// deny DNS on port 53
-	// TODO: Deny UDP overall?
-	//err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "--dport", "53", "-j", "DROP")
-	err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "-j", "DROP")
+	// deny DNS on port 53, else it interferes with DNS proxy
+	// Do not Deny UDP overall as developers may be using it, e.g. MS QUIC
+	// https://github.com/step-security/harden-runner/issues/112
+	err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "--dport", "53", "-j", "DROP")
+	//err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "-j", "DROP")
 	if err != nil {
 		return errors.Wrap(err, "failed to deny udp")
 	}
@@ -248,7 +249,7 @@ func AddAuditRules(firewall *Firewall) error {
 		return fmt.Errorf(fmt.Sprintf("ClearChain failed for DOCKER-USER: %v", err))
 	}
 
-	err = ipt.Append("filter", "DOCKER-USER", "-i", "docker0", "-p", "udp", "-j", "DROP")
+	err = ipt.Append("filter", "DOCKER-USER", "-i", "docker0", "-p", "udp", "--dport", "53", "-j", "DROP")
 
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("failed to deny udp docker interface: %v", err))
