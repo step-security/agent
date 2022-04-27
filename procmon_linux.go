@@ -8,8 +8,8 @@ import (
 
 	"github.com/elastic/go-libaudit/v2"
 	"github.com/elastic/go-libaudit/v2/auparse"
-	//	"github.com/elastic/go-libaudit/v2/rule"
-	//	"github.com/elastic/go-libaudit/v2/rule/flags"
+	"github.com/elastic/go-libaudit/v2/rule"
+	"github.com/elastic/go-libaudit/v2/rule/flags"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
@@ -58,45 +58,45 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		}
 
 		WriteLog("File monitor added")
+	*/
+	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/agent", fileMonitorTag))
+	actualBytes, _ := rule.Build(r)
 
-		r, _ = flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/agent", fileMonitorTag))
-		actualBytes, _ = rule.Build(r)
+	if err = client.AddRule(actualBytes); err != nil {
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
+		errc <- errors.Wrap(err, "failed to add audit rule")
+	}
 
-		if err = client.AddRule(actualBytes); err != nil {
-			WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
-			errc <- errors.Wrap(err, "failed to add audit rule")
+	WriteLog("Agent file monitor added")
+
+	// syscall connect
+	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S connect -k %s", netMonitorTag))
+
+	actualBytes, _ = rule.Build(r)
+
+	if err = client.AddRule(actualBytes); err != nil {
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
+		errc <- errors.Wrap(err, "failed to add audit rule for syscall connect")
+	}
+
+	WriteLog("Net monitor added")
+
+	// syscall process start
+	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S execve -k %s", processMonitorTag))
+
+	actualBytes, _ = rule.Build(r)
+
+	if err = client.AddRule(actualBytes); err != nil {
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
+		errc <- errors.Wrap(err, "failed to add audit rule for syscall execve")
+	}
+
+	/*if status.Enabled != 2 {
+		writeToFile("setting kernel settings as immutable")
+		if err = client.SetImmutable(libaudit.NoWait); err != nil {
+			return err
 		}
-
-		WriteLog("Agent file monitor added")
-
-		// syscall connect
-		r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S connect -k %s", netMonitorTag))
-
-		actualBytes, _ = rule.Build(r)
-
-		if err = client.AddRule(actualBytes); err != nil {
-			WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
-			errc <- errors.Wrap(err, "failed to add audit rule for syscall connect")
-		}
-
-		WriteLog("Net monitor added")
-
-		// syscall process start
-		r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S execve -k %s", processMonitorTag))
-
-		actualBytes, _ = rule.Build(r)
-
-		if err = client.AddRule(actualBytes); err != nil {
-			WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
-			errc <- errors.Wrap(err, "failed to add audit rule for syscall execve")
-		}
-
-		/*if status.Enabled != 2 {
-			writeToFile("setting kernel settings as immutable")
-			if err = client.SetImmutable(libaudit.NoWait); err != nil {
-				return err
-			}
-		}*/
+	}*/
 	WriteLog("Process monitor added")
 
 	// sending message to kernel registering our PID
