@@ -8,8 +8,8 @@ import (
 
 	"github.com/elastic/go-libaudit/v2"
 	"github.com/elastic/go-libaudit/v2/auparse"
-	"github.com/elastic/go-libaudit/v2/rule"
-	"github.com/elastic/go-libaudit/v2/rule/flags"
+	//	"github.com/elastic/go-libaudit/v2/rule"
+	//	"github.com/elastic/go-libaudit/v2/rule/flags"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
