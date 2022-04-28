@@ -48,7 +48,8 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		writeDone()
 	}
 
-	WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
+	// Uncomment to log file writes (only uncomment in INT env)
+	// WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
 
 	_, found := eventHandler.ProcessFileMap[event.Pid]
 	fileType := ""
@@ -68,7 +69,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
-	if isSourceCodeFile(event.FileName) && !isSyscallExcluded(event.Syscall) {
+	if isSourceCodeFile(event.FileName) {
 		_, found = eventHandler.SourceCodeMap[event.FileName]
 		if !found {
 			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
