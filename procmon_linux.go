@@ -48,7 +48,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("Rules deleted")
 
 	// files modified in working directory
-	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/runner", fileMonitorTag))
+	r, _ := flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/home/runner", fileMonitorTag))
 
 	actualBytes, _ := rule.Build(r)
 
@@ -59,7 +59,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 
 	WriteLog("File monitor added")
 
-	r, _ = flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/agent", fileMonitorTag))
+	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/home/agent", fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
