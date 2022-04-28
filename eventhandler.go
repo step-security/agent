@@ -48,6 +48,8 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		writeDone()
 	}
 
+	WriteLog(fmt.Sprintf("file event %v", event.FileName))
+
 	_, found := eventHandler.ProcessFileMap[event.Pid]
 	fileType := ""
 	if !found {

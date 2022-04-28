@@ -48,7 +48,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("Rules deleted")
 
 	// files modified in working directory
-	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/runner/work/harden-runner-repro/harden-runner-repro", fileMonitorTag))
+	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/runner", fileMonitorTag))
 
 	actualBytes, _ := rule.Build(r)
 
