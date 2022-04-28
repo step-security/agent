@@ -94,14 +94,6 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	eventHandler.fileMutex.Unlock()
 }
 
-func isSyscallExcluded(syscall string) bool {
-	if syscall == "chmod" || syscall == "unlink" || syscall == "unlinkat" {
-		return true
-	}
-
-	return false
-}
-
 func isSourceCodeFile(fileName string) bool {
 	ext := path.Ext(fileName)
 	// https://docs.github.com/en/get-started/learning-about-github/github-language-support
