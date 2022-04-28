@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -119,6 +120,49 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
+
+		for idx, value := range event.ProcessArguments {
+			//WriteLog(value)
+			if value == "docker" && len(event.ProcessArguments) >= 2 && idx < len(event.ProcessArguments) - 1 {
+
+				if event.ProcessArguments[idx+1] == "build" {
+					
+					WriteLog("\n")
+					cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+					if err != nil {
+						panic(err)
+						WriteLog("ERROR AT NEWCLIENTWITHOPTS")
+					}
+
+					containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+					if err != nil {
+						panic(err)
+						WriteLog("ERROR AT CONTAINERS")
+					}
+
+					for _, container := range containers {
+						WriteLog("Writing containers")
+						WriteLog(container.ID[:10])
+						WriteLog(container.Image)
+						WriteLog(fmt.Sprintf("%s %s\n", container.ID[:10], container.Image))
+						
+					}
+					images, _ := cli.ImageList(context.Background(), types.ImageListOptions{All: true})
+					for _, image := range images {
+						WriteLog("Writing images")
+						WriteLog(fmt.Sprintf("image: %v", image))
+					}
+
+					provdump := provgen(event.ProcessArguments)
+
+					payload, _ := json.MarshalIndent(provdump, "", "  ")
+
+					WriteLog(string(payload))
+				}
+
+			}
+
+		}
 	}
 
 	eventHandler.procMutex.Unlock()
