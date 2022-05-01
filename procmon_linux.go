@@ -118,6 +118,7 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 	eventHandler.ProcessFileMap = make(map[string]bool)
 	eventHandler.SourceCodeMap = make(map[string][]*Event)
 	eventHandler.ProcessMap = make(map[string]*Process)
+	eventHandler.FileOverwriteCounterMap = make(map[string]int)
 
 	for {
 		rawEvent, err := r.Receive(false)
