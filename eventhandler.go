@@ -90,9 +90,9 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 					if !found || counter < 3 {
 						checksum, err := getProgramChecksum(event.Exe)
 						if err != nil {
-							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
+							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
 						} else {
-							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by exe: %s [%s]", event.FileName, event.Syscall, event.Exe, checksum))
+							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s [%s]", event.FileName, event.Syscall, event.Exe, checksum))
 						}
 
 						eventHandler.FileOverwriteCounterMap[event.Exe]++
