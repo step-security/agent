@@ -18,17 +18,18 @@ import (
 )
 
 type EventHandler struct {
-	CorrelationId        string
-	Repo                 string
-	ApiClient            *ApiClient
-	DNSProxy             *DNSProxy
-	ProcessConnectionMap map[string]bool
-	ProcessFileMap       map[string]bool
-	ProcessMap           map[string]*Process
-	SourceCodeMap        map[string][]*Event
-	netMutex             sync.RWMutex
-	fileMutex            sync.RWMutex
-	procMutex            sync.RWMutex
+	CorrelationId           string
+	Repo                    string
+	ApiClient               *ApiClient
+	DNSProxy                *DNSProxy
+	ProcessConnectionMap    map[string]bool
+	ProcessFileMap          map[string]bool
+	ProcessMap              map[string]*Process
+	SourceCodeMap           map[string][]*Event
+	FileOverwriteCounterMap map[string]int // to count file overwrites by an exe
+	netMutex                sync.RWMutex
+	fileMutex               sync.RWMutex
+	procMutex               sync.RWMutex
 }
 
 var classAPrivateSubnet, classBPrivateSubnet, classCPrivateSubnet, loopBackSubnet, ipv6LinkLocalSubnet, ipv6LocalSubnet *net.IPNet
@@ -85,11 +86,16 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 			if isFromDifferentProcess {
 				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
 				if !strings.Contains(event.FileName, "node_modules/") { // node_modules folder has overwrites by design, even has .cs files in some cases. Need a better way to handle that
-					checksum, err := getProgramChecksum(event.Exe)
-					if err != nil {
-						WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by %s", event.FileName, event.Syscall, event.Exe))
-					} else {
-						WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by %s [%s]", event.FileName, event.Syscall, event.Exe, checksum))
+					counter, found := eventHandler.FileOverwriteCounterMap[event.Exe]
+					if found && counter < 3 {
+						checksum, err := getProgramChecksum(event.Exe)
+						if err != nil {
+							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by %s", event.FileName, event.Syscall, event.Exe))
+						} else {
+							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by %s [%s]", event.FileName, event.Syscall, event.Exe, checksum))
+						}
+
+						eventHandler.FileOverwriteCounterMap[event.Exe]++
 					}
 				}
 			}
