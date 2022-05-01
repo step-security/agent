@@ -85,7 +85,12 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 			if isFromDifferentProcess {
 				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
 				if !strings.Contains(event.FileName, "node_modules/") { // node_modules folder has overwrites by design, even has .cs files in some cases. Need a better way to handle that
-					WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by %s", event.FileName, event.Syscall, event.Exe))
+					checksum, err := getProgramChecksum(event.Exe)
+					if err != nil {
+						WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by %s", event.FileName, event.Syscall, event.Exe))
+					} else {
+						WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by %s [%s]", event.FileName, event.Syscall, event.Exe, checksum))
+					}
 				}
 			}
 		}
