@@ -92,6 +92,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 						if err != nil {
 							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
 						} else {
+							WriteLog(fmt.Sprintf("[Source code overwritten] file: %s syscall: %s by exe: %s [%s] Timestamp: %s", event.FileName, event.Syscall, event.Exe, checksum, event.Timestamp))
 							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s [%s]", event.FileName, event.Syscall, event.Exe, checksum))
 						}
 
