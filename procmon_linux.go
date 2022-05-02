@@ -48,7 +48,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("Rules deleted")
 
 	// files modified in working directory
-	r, _ := flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/runner", fileMonitorTag))
+	r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", "/home/runner", fileMonitorTag))
 
 	actualBytes, _ := rule.Build(r)
 
@@ -59,7 +59,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 
 	WriteLog("File monitor added")
 
-	r, _ = flags.Parse(fmt.Sprintf("-w %s -p wa -k %s", "/home/agent", fileMonitorTag))
+	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/home/agent", fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
@@ -118,6 +118,7 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 	eventHandler.ProcessFileMap = make(map[string]bool)
 	eventHandler.SourceCodeMap = make(map[string][]*Event)
 	eventHandler.ProcessMap = make(map[string]*Process)
+	eventHandler.FileOverwriteCounterMap = make(map[string]int)
 
 	for {
 		rawEvent, err := r.Receive(false)

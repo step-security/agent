@@ -18,17 +18,18 @@ import (
 )
 
 type EventHandler struct {
-	CorrelationId        string
-	Repo                 string
-	ApiClient            *ApiClient
-	DNSProxy             *DNSProxy
-	ProcessConnectionMap map[string]bool
-	ProcessFileMap       map[string]bool
-	ProcessMap           map[string]*Process
-	SourceCodeMap        map[string][]*Event
-	netMutex             sync.RWMutex
-	fileMutex            sync.RWMutex
-	procMutex            sync.RWMutex
+	CorrelationId           string
+	Repo                    string
+	ApiClient               *ApiClient
+	DNSProxy                *DNSProxy
+	ProcessConnectionMap    map[string]bool
+	ProcessFileMap          map[string]bool
+	ProcessMap              map[string]*Process
+	SourceCodeMap           map[string][]*Event
+	FileOverwriteCounterMap map[string]int // to count file overwrites by an exe
+	netMutex                sync.RWMutex
+	fileMutex               sync.RWMutex
+	procMutex               sync.RWMutex
 }
 
 var classAPrivateSubnet, classBPrivateSubnet, classCPrivateSubnet, loopBackSubnet, ipv6LinkLocalSubnet, ipv6LocalSubnet *net.IPNet
@@ -48,6 +49,9 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		writeDone()
 	}
 
+	// Uncomment to log file writes (only uncomment in INT env)
+	// WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
+
 	_, found := eventHandler.ProcessFileMap[event.Pid]
 	fileType := ""
 	if !found {
@@ -66,7 +70,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
-	if isSourceCodeFile(event.FileName) && !isSyscallExcluded(event.Syscall) {
+	if isSourceCodeFile(event.FileName) {
 		_, found = eventHandler.SourceCodeMap[event.FileName]
 		if !found {
 			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
@@ -82,21 +86,22 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 			if isFromDifferentProcess {
 				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
 				if !strings.Contains(event.FileName, "node_modules/") { // node_modules folder has overwrites by design, even has .cs files in some cases. Need a better way to handle that
-					WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten %s syscall: %s by %s", event.FileName, event.Syscall, event.Exe))
+					counter, found := eventHandler.FileOverwriteCounterMap[event.Exe]
+					if !found || counter < 3 {
+						checksum, err := getProgramChecksum(event.Exe)
+						if err == nil {
+							WriteLog(fmt.Sprintf("[Source code overwritten] file: %s syscall: %s by exe: %s [%s] Timestamp: %s", event.FileName, event.Syscall, event.Exe, checksum, event.Timestamp.Format("2006-01-02T15:04:05.999999999Z")))
+							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
+						}
+
+						eventHandler.FileOverwriteCounterMap[event.Exe]++
+					}
 				}
 			}
 		}
 	}
 
 	eventHandler.fileMutex.Unlock()
-}
-
-func isSyscallExcluded(syscall string) bool {
-	if syscall == "chmod" || syscall == "unlink" || syscall == "unlinkat" {
-		return true
-	}
-
-	return false
 }
 
 func isSourceCodeFile(fileName string) bool {
