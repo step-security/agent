@@ -14,6 +14,13 @@ builds:
     goarch:
       - amd64
 
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+
+
     # Optionally override the matrix generation and specify only the final list of targets.
     # Format is `{goos}_{goarch}` with optionally a suffix with `_{goarm}` or `_{gomips}`.
     # This overrides `goos`, `goarch`, `goarm`, `gomips` and `ignores`.
