@@ -14,11 +14,11 @@ builds:
     goarch:
       - amd64
 
-    mod_timestamp: '{{ .CommitTimestamp }}'
+    mod_timestamp: '123'
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date=123
 
 
     # Optionally override the matrix generation and specify only the final list of targets.
