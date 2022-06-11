@@ -18,4 +18,4 @@ jobs:
         go-version: 1.17
     - name: Run coverage
       run: sudo CI=true go test -race -coverprofile=coverage.txt -covermode=atomic      
-    - uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b
+    - uses: codecov/codecov-action@81cd2dc8148241f03f5839d295e000b8f761e378
