@@ -57,6 +57,13 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 			errc <- errors.Wrap(err, "failed to set audit client")
 		}
 
+		WriteLog(fmt.Sprintf("sending message to kernel registering our PID (%v) as the audit daemon", os.Getpid()))
+
+		// sending message to kernel registering our PID
+		if err = client.SetPID(libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to set audit PID")
+		}
+
 		if err = client.SetEnabled(true, libaudit.WaitForReply); err != nil {
 			errc <- errors.Wrap(err, "failed to set audit client")
 		}
@@ -127,12 +134,6 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		}
 	}*/
 	WriteLog("Process monitor added")
-	WriteLog(fmt.Sprintf("sending message to kernel registering our PID (%v) as the audit daemon", os.Getpid()))
-
-	// sending message to kernel registering our PID
-	if err = client.SetPID(libaudit.WaitForReply); err != nil {
-		errc <- errors.Wrap(err, "failed to set audit PID")
-	}
 
 	WriteLog("receive called")
 	WriteLog("\n")
