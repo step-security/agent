@@ -46,7 +46,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 			errc <- errors.Wrap(err, "failed to set SetBacklogWaitTime")
 		}
 
-		if err = client.SetBacklogLimit(64, libaudit.WaitForReply); err != nil {
+		if err = client.SetBacklogLimit(640000, libaudit.WaitForReply); err != nil {
 			errc <- errors.Wrap(err, "failed to SetBacklogLimit")
 		}
 
