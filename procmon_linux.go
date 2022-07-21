@@ -42,6 +42,10 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		WriteLog("Status is enabled")
 	}
 
+	if err = client.SetBacklogWaitTime(15000, libaudit.NoWait); err != nil {
+		errc <- errors.Wrap(err, "failed to set SetBacklogWaitTime")
+	}
+
 	/*if _, err = client.DeleteRules(); err != nil {
 		errc <- errors.Wrap(err, "failed to delete audit rules")
 	}
