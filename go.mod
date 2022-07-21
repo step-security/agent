@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/coreos/go-iptables v0.6.0
-	github.com/elastic/go-libaudit/v2 v2.3.0
+	github.com/elastic/go-libaudit/v2 v2.3.1
 	github.com/florianl/go-nflog/v2 v2.0.1
 	github.com/google/gopacket v1.1.19
 	github.com/jarcoal/httpmock v1.0.8
