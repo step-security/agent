@@ -126,7 +126,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("Process monitor added")
 
 	// sending message to kernel registering our PID
-	if err = client.SetPID(libaudit.NoWait); err != nil {
+	if err = client.SetPID(libaudit.WaitForReply); err != nil {
 		errc <- errors.Wrap(err, "failed to set audit PID")
 	}
 
