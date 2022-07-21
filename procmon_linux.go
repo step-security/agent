@@ -33,13 +33,14 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to get audit client status")
 	}
 
+	WriteLog(fmt.Sprintf("Status: %v\n", status))
+
 	if status.Enabled == 0 {
 		if err = client.SetEnabled(true, libaudit.WaitForReply); err != nil {
 			errc <- errors.Wrap(err, "failed to set audit client")
 		}
+		WriteLog("Status is enabled")
 	}
-
-	WriteLog("Status is enabled")
 
 	if _, err = client.DeleteRules(); err != nil {
 		errc <- errors.Wrap(err, "failed to delete audit rules")
