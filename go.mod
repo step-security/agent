@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/coreos/go-iptables v0.6.0
-	github.com/elastic/go-libaudit/v2 v2.2.0
+	github.com/elastic/go-libaudit/v2 v2.3.1
 	github.com/florianl/go-nflog/v2 v2.0.1
 	github.com/google/gopacket v1.1.19
 	github.com/jarcoal/httpmock v1.0.8
@@ -22,12 +22,15 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/josharian/native v1.0.0 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mdlayher/socket v0.2.3 // indirect
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
+	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/multierr v1.7.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/tools v0.1.11-0.20220316014157-77aa08bb151a // indirect
