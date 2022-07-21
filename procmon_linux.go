@@ -33,13 +33,49 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to get audit client status")
 	}
 
+	WriteLog(fmt.Sprintf("Status: %+v\n", status))
+
 	if status.Enabled == 0 {
 		if err = client.SetEnabled(true, libaudit.WaitForReply); err != nil {
 			errc <- errors.Wrap(err, "failed to set audit client")
 		}
+		WriteLog("Status is enabled")
+	} else if status.Enabled == 1 {
+
+		path, _ := getProcessExe(fmt.Sprintf("%d", status.PID))
+		WriteLog(fmt.Sprintf("Path of PID: %+s\n", path))
+
+		if err = client.SetBacklogWaitTime(15000, libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to set SetBacklogWaitTime")
+		}
+
+		if err = client.SetBacklogLimit(640000, libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to SetBacklogLimit")
+		}
+
+		if err = client.SetEnabled(false, libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to set audit client")
+		}
+
+		WriteLog(fmt.Sprintf("sending message to kernel registering our PID (%v) as the audit daemon", os.Getpid()))
+
+		// sending message to kernel registering our PID
+		if err = client.SetPID(libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to set audit PID")
+		}
+
+		if err = client.SetEnabled(true, libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to set audit client")
+		}
+		WriteLog("Status is enabled")
 	}
 
-	WriteLog("Status is enabled")
+	status, err = client.GetStatus()
+	if err != nil {
+		errc <- errors.Wrap(err, "failed to get audit client status")
+	}
+
+	WriteLog(fmt.Sprintf("Status: %+v\n", status))
 
 	if _, err = client.DeleteRules(); err != nil {
 		errc <- errors.Wrap(err, "failed to delete audit rules")
@@ -99,11 +135,6 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	}*/
 	WriteLog("Process monitor added")
 
-	// sending message to kernel registering our PID
-	if err = client.SetPID(libaudit.NoWait); err != nil {
-		errc <- errors.Wrap(err, "failed to set audit PID")
-	}
-
 	WriteLog("receive called")
 	WriteLog("\n")
 
@@ -131,6 +162,8 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 			rawEvent.Type > auparse.AUDIT_LAST_USER_MSG2 {
 			continue
 		}
+
+		WriteLog(fmt.Sprintf("type=%v msg=%v\n", rawEvent.Type, string(rawEvent.Data)))
 
 		message, err := auparse.Parse(rawEvent.Type, string(rawEvent.Data))
 		if err != nil {
