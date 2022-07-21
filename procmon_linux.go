@@ -42,12 +42,12 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		WriteLog("Status is enabled")
 	}
 
-	if _, err = client.DeleteRules(); err != nil {
+	/*if _, err = client.DeleteRules(); err != nil {
 		errc <- errors.Wrap(err, "failed to delete audit rules")
 	}
 
 	WriteLog("Rules deleted")
-	/*
+
 		// files modified in working directory
 		r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", "/home/runner", fileMonitorTag))
 
@@ -81,7 +81,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		}
 
 		WriteLog("Net monitor added")
-	*/
+
 	// syscall process start
 	r, _ := flags.Parse(fmt.Sprintf("-a exit,always -S execve -k %s", processMonitorTag))
 
@@ -133,13 +133,13 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 			continue
 		}
 
+		WriteLog(fmt.Sprintf("type=%v msg=%v\n", rawEvent.Type, string(rawEvent.Data)))
+
 		message, err := auparse.Parse(rawEvent.Type, string(rawEvent.Data))
 		if err != nil {
 			return errors.Wrap(err, "parse failed.")
 		}
 		eventMap := message.ToMapStr()
-
-		WriteLog(fmt.Sprintf("Event %v\n", eventMap))
 
 		p.PrepareEvent(int(message.Sequence), eventMap)
 		if isEventReady(p.Events[int(message.Sequence)]) {
