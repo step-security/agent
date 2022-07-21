@@ -42,6 +42,9 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		WriteLog("Status is enabled")
 	} else if status.Enabled == 1 {
 
+		path, _ := getProcessExe(fmt.Sprintf("%d", status.PID))
+		WriteLog(fmt.Sprintf("Path of PID: %+s\n", path))
+
 		if err = client.SetBacklogWaitTime(15000, libaudit.WaitForReply); err != nil {
 			errc <- errors.Wrap(err, "failed to set SetBacklogWaitTime")
 		}
@@ -124,6 +127,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		}
 	}*/
 	WriteLog("Process monitor added")
+	WriteLog(fmt.Sprintf("sending message to kernel registering our PID (%v) as the audit daemon", os.Getpid()))
 
 	// sending message to kernel registering our PID
 	if err = client.SetPID(libaudit.WaitForReply); err != nil {
