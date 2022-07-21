@@ -33,7 +33,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to get audit client status")
 	}
 
-	WriteLog(fmt.Sprintf("Status: %v\n", status))
+	WriteLog(fmt.Sprintf("Status: %+v\n", status))
 
 	if status.Enabled == 0 {
 		if err = client.SetEnabled(true, libaudit.WaitForReply); err != nil {
