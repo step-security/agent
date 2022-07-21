@@ -59,8 +59,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 
 	WriteLog("File monitor added")
 	*/
-
-	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/home/agent", fileMonitorTag))
+	r, _ := flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/home/agent", fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
