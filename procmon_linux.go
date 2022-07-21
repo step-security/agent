@@ -40,11 +40,21 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 			errc <- errors.Wrap(err, "failed to set audit client")
 		}
 		WriteLog("Status is enabled")
+	} else if status.Enabled == 1 {
+		if err = client.SetEnabled(false, libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to set audit client")
+		}
+
+		if err = client.SetEnabled(true, libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to set audit client")
+		}
+		WriteLog("Status is enabled")
 	}
 
-	if err = client.SetBacklogWaitTime(15000, libaudit.WaitForReply); err != nil {
-		errc <- errors.Wrap(err, "failed to set SetBacklogWaitTime")
-	}
+	/*
+		if err = client.SetBacklogWaitTime(15000, libaudit.WaitForReply); err != nil {
+			errc <- errors.Wrap(err, "failed to set SetBacklogWaitTime")
+		}*/
 
 	status, err = client.GetStatus()
 	if err != nil {
