@@ -79,7 +79,7 @@ func Test_writeResolveConfig(t *testing.T) {
 	}{
 		{name: "overwrite file",
 			args:    args{configPath: tmpFileName},
-			want:    "[Resolve]\nDNS=127.0.0.1\nDomains=~.\n",
+			want:    "[Resolve]\nDNS=127.0.0.1\n",
 			wantErr: false},
 	}
 	for _, tt := range tests {

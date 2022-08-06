@@ -21,7 +21,7 @@ const (
 	dockerDaemonConfigPath = "/etc/docker/daemon.json"
 	resolvedConfigPath     = "/etc/systemd/resolved.conf"
 	dockerDnsServer        = "172.17.0.1"
-	localDnsServer         = "[Resolve]\nDNS=127.0.0.1\nDomains=~.\n"
+	localDnsServer         = "[Resolve]\nDNS=127.0.0.1\n"
 )
 
 func updateDockerConfig(configPath string) error {
