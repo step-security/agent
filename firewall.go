@@ -112,7 +112,7 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 
 	// Allow AzureIPAddress
 	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, allProtocols,
-		destination, AzureIPAddress, target, reject)
+		destination, AzureIPAddress, target, accept)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to add rule")
