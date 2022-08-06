@@ -97,7 +97,7 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 				return errors.Wrap(err, fmt.Sprintf("failed to append endpoint rule ip:%s, port:%s", ipAddress, endpoint.port))
 			}
 
-			WriteLog(fmt.Sprintf("added ip to allowed list in firewall ip:%s port:%s interface:%s", ipAddress, endpoint.port, netInterface))
+			WriteLog(fmt.Sprintf("added CIDR to allowed list in firewall CIDR:%s port:%s interface:%s", ipAddress, endpoint.port, netInterface))
 		}
 	}
 
@@ -222,7 +222,7 @@ func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
 			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
 		}
 
-		WriteLog(fmt.Sprintf("inserted ip to allowed list in firewall ip:%s port:%s interface:%s", ipAddress, port, defaultInterface))
+		WriteLog(fmt.Sprintf("inserted CIDR to allowed list in firewall CIDR:%s port:%s interface:%s", ipAddress, port, defaultInterface))
 	}
 
 	exists, err = ipt.Exists(filterTable, dockerUserChain, inbound, dockerInterface, protocol, tcp,
@@ -242,7 +242,7 @@ func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
 			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
 		}
 
-		WriteLog(fmt.Sprintf("inserted ip to allowed list in firewall ip:%s port:%s interface:%s", ipAddress, port, dockerInterface))
+		WriteLog(fmt.Sprintf("inserted CIDR to allowed list in firewall CIDR:%s port:%s interface:%s", ipAddress, port, dockerInterface))
 	}
 
 	return nil
