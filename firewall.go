@@ -110,6 +110,11 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 		return errors.Wrap(err, "failed to add rule")
 	}
 
+	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, "udp", "--dport", "53", "-j", "DROP")
+	//err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "-j", "DROP")
+	if err != nil {
+		return errors.Wrap(err, "failed to deny udp")
+	}
 	// Allow AzureIPAddress
 	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
 		destination, AzureIPAddress, target, accept)
