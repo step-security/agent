@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
@@ -77,12 +78,26 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 	}
 
 	for _, endpoint := range endpoints {
-		err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
-			destination, endpoint.ipAddress,
+		ipAddress := convertIpAddressToCIDR(endpoint.ipAddress)
+
+		exists, err := ipt.Exists(filterTable, chain, direction, netInterface, protocol, tcp,
+			destination, ipAddress,
 			destinationPort, endpoint.port, target, accept)
 
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to append endpoint rule ip:%s, port:%s", endpoint.ipAddress, endpoint.port))
+			return errors.Wrap(err, fmt.Sprintf("failed to check if endpoint exists ip:%s, port:%s", ipAddress, endpoint.port))
+		}
+
+		if !exists {
+			err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
+				destination, ipAddress,
+				destinationPort, endpoint.port, target, accept)
+
+			if err != nil {
+				return errors.Wrap(err, fmt.Sprintf("failed to append endpoint rule ip:%s, port:%s", ipAddress, endpoint.port))
+			}
+
+			WriteLog(fmt.Sprintf("added ip to allowed list in firewall ip:%s port:%s interface:%s", ipAddress, endpoint.port, netInterface))
 		}
 	}
 
@@ -160,6 +175,20 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 	return nil
 }
 
+func convertIpAddressToCIDR(ip string) string {
+	if isIPv6(ip) {
+		return ip
+	}
+
+	ipParts := strings.Split(ip, ".")
+	if len(ipParts) == 4 {
+		cidr := fmt.Sprintf("%s.%s.%s.0/24", ipParts[0], ipParts[1], ipParts[2])
+		return cidr
+	}
+
+	return ip
+}
+
 func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
 	var ipt IPTables
 	var err error
@@ -173,6 +202,8 @@ func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
 	} else {
 		ipt = firewall.IPTables
 	}
+
+	ipAddress = convertIpAddressToCIDR(ipAddress)
 
 	exists, err := ipt.Exists(filterTable, outputChain, outbound, defaultInterface, protocol, tcp,
 		destination, ipAddress,
@@ -190,6 +221,8 @@ func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
 		}
+
+		WriteLog(fmt.Sprintf("inserted ip to allowed list in firewall ip:%s port:%s interface:%s", ipAddress, port, defaultInterface))
 	}
 
 	exists, err = ipt.Exists(filterTable, dockerUserChain, inbound, dockerInterface, protocol, tcp,
@@ -208,6 +241,8 @@ func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
 		}
+
+		WriteLog(fmt.Sprintf("inserted ip to allowed list in firewall ip:%s port:%s interface:%s", ipAddress, port, dockerInterface))
 	}
 
 	return nil
