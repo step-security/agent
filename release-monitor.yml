@@ -1,0 +1,18 @@
+name: "step-security/agent release"
+release-process:
+  artifact-location:
+    github-release:
+      repo: step-security/agent
+  reproducible-build:
+    - artifact: agent_{{.Version}}_linux_amd64.tar.gz
+      binary: agent
+      build-command: go build -trimpath -ldflags="-s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date=123"
+      go-version: 1.17.11      
+  pipeline:
+    github-action:
+      repo: step-security/agent
+      workflow: release.yml
+    branches: 
+      - main      
+    tags:
+      - v*
