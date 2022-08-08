@@ -21,7 +21,10 @@ const (
 	dockerDaemonConfigPath = "/etc/docker/daemon.json"
 	resolvedConfigPath     = "/etc/systemd/resolved.conf"
 	dockerDnsServer        = "172.17.0.1"
-	localDnsServer         = "[Resolve]\nDNS=127.0.0.1\n"
+	// https://unix.stackexchange.com/questions/508397/what-is-the-recommended-way-to-set-a-global-dns-server-override-on-a-system-usin
+	// Domains=~. instructs systemd-resolved to always use the global nameservers
+	// and to never query any DHCP-supplied nameservers
+	localDnsServer = "[Resolve]\nDNS=127.0.0.1\nDomains=~.\n"
 )
 
 func updateDockerConfig(configPath string) error {
