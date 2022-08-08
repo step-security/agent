@@ -171,7 +171,7 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 
 	// reload will apply the live-restore config so running containers restart after docker is restarted
 	if !mock {
-		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl reload docker")
+		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl reload docker")
 	}
 
 	err = cmd.Run()
