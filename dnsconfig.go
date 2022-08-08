@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -178,6 +179,8 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("error reloading docker: %v", err))
 	}
+
+	time.Sleep(time.Second)
 
 	// restart docker to apply DNS changes
 	if cmd == nil {
