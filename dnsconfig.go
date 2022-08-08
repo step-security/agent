@@ -46,6 +46,7 @@ func updateDockerConfig(configPath string) error {
 	}
 
 	m["dns"] = []string{dockerDnsServer}
+	m["live-restore"] = true
 
 	config, err := json.Marshal(m)
 	if err != nil {
@@ -162,19 +163,29 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("error backing up docker config: %v", err))
 	}
-
+	mock := cmd != nil
 	err = updateDockerConfig(configPath)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("error updating to docker daemon config: %v", err))
 	}
 
-	if cmd == nil {
-		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl reload docker")
+	// reload will apply the live-restore config so running containers restart after docker is restarted
+	if !mock {
+		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl reload docker")
 	}
 
 	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("error reloading docker: %v", err))
+	}
+
+	if !mock {
+		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl restart docker")
+	}
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("error restarting docker: %v", err))
 	}
 
 	return nil
