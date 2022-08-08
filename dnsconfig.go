@@ -181,12 +181,21 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 
 	// restart docker to apply DNS changes
 	if cmd == nil {
-		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl restart docker")
+		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl stop docker")
 	}
 
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error restarting docker: %v", err))
+		return fmt.Errorf(fmt.Sprintf("error stopping docker: %v", err))
+	}
+
+	if cmd == nil {
+		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl start docker")
+	}
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("error starting docker: %v", err))
 	}
 
 	return nil
