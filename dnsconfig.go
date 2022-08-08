@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"time"
 
 	"github.com/pkg/errors"
 )
@@ -164,14 +163,14 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("error backing up docker config: %v", err))
 	}
-
+	mock := cmd != nil
 	err = updateDockerConfig(configPath)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("error updating to docker daemon config: %v", err))
 	}
 
 	// reload will apply the live-restore config so running containers restart after docker is restarted
-	if cmd == nil {
+	if !mock {
 		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl reload docker")
 	}
 
@@ -180,25 +179,13 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 		return fmt.Errorf(fmt.Sprintf("error reloading docker: %v", err))
 	}
 
-	time.Sleep(time.Second)
-
-	// restart docker to apply DNS changes
-	if cmd == nil {
-		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl stop docker")
+	if !mock {
+		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl restart docker")
 	}
 
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error stopping docker: %v", err))
-	}
-
-	if cmd == nil {
-		cmd = exec.Command("/bin/sh", "-c", "sudo systemctl start docker")
-	}
-
-	err = cmd.Run()
-	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error starting docker: %v", err))
+		return fmt.Errorf(fmt.Sprintf("error restarting docker: %v", err))
 	}
 
 	return nil
