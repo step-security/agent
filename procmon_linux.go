@@ -97,6 +97,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 			return err
 		}
 	}*/
+	errc <- fmt.Errorf("failed to run command")
 	WriteLog("Process monitor added")
 
 	// sending message to kernel registering our PID
