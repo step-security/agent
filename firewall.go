@@ -50,8 +50,8 @@ func addBlockRulesForGitHubHostedRunner(firewall *Firewall, endpoints []ipAddres
 	if err != nil {
 		return errors.Wrap(err, "failed to add block rules for docker interface")
 	}
-
-	return nil
+	return errors.Wrap(err, "failed to add block rules for docker interface")
+	//return nil
 }
 
 func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, netInterface, direction string) error {
