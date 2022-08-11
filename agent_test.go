@@ -147,7 +147,7 @@ func TestRun(t *testing.T) {
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
 
-		{name: "success egress blocked", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent-allowed-endpoints.json",
+		/*{name: "success egress blocked", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent-allowed-endpoints.json",
 			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
@@ -158,7 +158,7 @@ func TestRun(t *testing.T) {
 			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
-
+		*/
 		{name: "dns failure", args: args{ctxCancelDuration: 5, configFilePath: "./testfiles/agent.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServerWithError{},
 			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: true},
