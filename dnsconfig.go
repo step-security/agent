@@ -193,14 +193,14 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 
 func (d *DnsConfig) RevertDockerDNSServer(cmd Command, configPath string) error {
 	if len(d.DockerConfigBackUpPath) > 0 {
-
+		WriteLog("Reverting DockerDNS config")
 		err := copy(d.DockerConfigBackUpPath, configPath)
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("error recovering docker config: %v", err))
 		}
 
 		if cmd == nil {
-			cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl reload docker")
+			cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl restart docker")
 		}
 
 		err = cmd.Run()
