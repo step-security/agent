@@ -70,7 +70,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 
 	WriteLog("Agent file monitor added")
 
-	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/etc/docker/daemon.json", fileMonitorTag))
+	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", dockerDaemonConfigPath, fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
@@ -80,7 +80,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 
 	WriteLog("Docker's daemon.json file monitor added")
 
-	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/etc/systemd/resolved.conf", fileMonitorTag))
+	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", resolvedConfigPath, fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
