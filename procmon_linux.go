@@ -74,7 +74,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
-		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
+		WriteLog(fmt.Sprintf("failed to add audit rule for dockerDaemonConfigPath %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
@@ -84,7 +84,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
-		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
+		WriteLog(fmt.Sprintf("failed to add audit rule for resolvedConfigPath %v", err))
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
