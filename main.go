@@ -17,7 +17,7 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Kill, syscall.SIGHUP)
+	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGHUP)
 
 	c := &config{}
 
@@ -33,10 +33,10 @@ func main() {
 				switch s {
 				case syscall.SIGHUP:
 					c.init(agentConfigFilePath)
-				case os.Interrupt:
-					WriteLog("got os.kill")
-					cancel()
-					os.Exit(1)
+				case syscall.SIGTERM:
+					WriteAnnotation(fmt.Sprintf("%s Received SIGTERM signal", StepSecurityAnnotationPrefix))
+					//cancel()
+					//os.Exit(1)
 				}
 			case <-ctx.Done():
 				WriteLog("called ctx.Done()")
