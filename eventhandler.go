@@ -49,6 +49,14 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		writeDone()
 	}
 
+	if strings.Contains(event.FileName, "daemon.json") {
+		WriteAnnotation(fmt.Sprintf("%s Overwrite detected for %s", StepSecurityAnnotationPrefix, dockerDaemonConfigPath))
+	}
+
+	if strings.Contains(event.FileName, "resolved.conf") {
+		WriteAnnotation(fmt.Sprintf("%s Overwrite detected for %s", StepSecurityAnnotationPrefix, resolvedConfigPath))
+	}
+
 	// Uncomment to log file writes (only uncomment in INT env)
 	// WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
 
