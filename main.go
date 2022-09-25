@@ -17,9 +17,7 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Kill, syscall.SIGHUP)
-
-	c := &config{}
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	defer func() {
 		signal.Stop(signalChan)
@@ -29,15 +27,8 @@ func main() {
 	go func() {
 		for {
 			select {
-			case s := <-signalChan:
-				switch s {
-				case syscall.SIGHUP:
-					c.init(agentConfigFilePath)
-				case os.Interrupt:
-					WriteLog("got os.kill")
-					cancel()
-					os.Exit(1)
-				}
+			case <-signalChan:
+				WriteAnnotation(fmt.Sprintf("%s Received SIGTERM signal", StepSecurityAnnotationPrefix))
 			case <-ctx.Done():
 				WriteLog("called ctx.Done()")
 				os.Exit(1)
