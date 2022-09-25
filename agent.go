@@ -110,7 +110,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			ipAddress, err := dnsProxy.getIPByDomain(domainName)
 			if err != nil {
 				WriteLog(fmt.Sprintf("Error resolving allowed domain %v", err))
-				WriteAnnotation(fmt.Sprintf("%s Reverting agent since allowed endpoint %s could not be resolved",StepSecurityAnnotationPrefix, domainName))
+				WriteAnnotation(fmt.Sprintf("%s Reverting agent since allowed endpoint %s could not be resolved", StepSecurityAnnotationPrefix, domainName))
 				RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
 				return err
 			}
