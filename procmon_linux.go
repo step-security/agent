@@ -6,14 +6,15 @@ package main
 import (
 	"fmt"
 
+	"io/ioutil"
+	"os"
+	"strings"
+
 	"github.com/elastic/go-libaudit/v2"
 	"github.com/elastic/go-libaudit/v2/auparse"
 	"github.com/elastic/go-libaudit/v2/rule"
 	"github.com/elastic/go-libaudit/v2/rule/flags"
 	"github.com/pkg/errors"
-	"io/ioutil"
-	"os"
-	"strings"
 )
 
 func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
@@ -68,6 +69,26 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	}
 
 	WriteLog("Agent file monitor added")
+
+	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", dockerDaemonConfigPath, fileMonitorTag))
+	actualBytes, _ = rule.Build(r)
+
+	if err = client.AddRule(actualBytes); err != nil {
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
+		errc <- errors.Wrap(err, "failed to add audit rule")
+	}
+
+	WriteLog("Docker's daemon.json file monitor added")
+
+	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", resolvedConfigPath, fileMonitorTag))
+	actualBytes, _ = rule.Build(r)
+
+	if err = client.AddRule(actualBytes); err != nil {
+		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
+		errc <- errors.Wrap(err, "failed to add audit rule")
+	}
+
+	WriteLog("Systemd's resolved.conf file monitor added")
 
 	// syscall connect
 	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S connect -k %s", netMonitorTag))
