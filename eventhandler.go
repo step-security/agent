@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 
+	"encoding/json"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
@@ -135,7 +137,9 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
 		if event.Euid == "0" {
-			WriteLog(fmt.Sprintf("sudo process started: %+v", eventHandler.ProcessMap[event.Pid]))
+			tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
+			json, _ := json.MarshalIndent(tool, "", "    ")
+			WriteLog(fmt.Sprintf("sudo process started: %+v, processtree: %s", eventHandler.ProcessMap[event.Pid], string(json)))
 		}
 	}
 
