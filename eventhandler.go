@@ -13,8 +13,6 @@ import (
 	"strings"
 	"sync"
 
-	"encoding/json"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
@@ -136,17 +134,17 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
-		proc := eventHandler.ProcessMap[event.Pid]
+		proc := *eventHandler.ProcessMap[event.Pid]
 		eventHandler.procMutex.Unlock()
 
 		if event.Euid == "0" {
-			tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
-			json, err := json.MarshalIndent(tool, "", "    ")
-			if err != nil {
-				WriteLog(fmt.Sprintf("sudo process started: %+v, error in marshalling toolchain: %v", proc, err))
-			} else {
-				WriteLog(fmt.Sprintf("sudo process started: %+v, processtree: %s", proc, string(json)))
-			}
+			//tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
+			//json, err := json.MarshalIndent(tool, "", "    ")
+			//if err != nil {
+			//WriteLog(fmt.Sprintf("sudo process started: %+v, error in marshalling toolchain: %v", proc, err))
+			//} else {
+			WriteLog(fmt.Sprintf("sudo process started: %+v, processtree: %s", proc, ""))
+			//}
 		}
 	} else {
 		eventHandler.procMutex.Unlock()
