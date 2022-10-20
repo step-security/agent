@@ -57,6 +57,7 @@ func (p *ProcessMonitor) PrepareEvent(sequence int, eventMap map[string]interfac
 		p.Events[sequence] = &Event{}
 	}
 
+	WriteLog(fmt.Sprintf("event: %+v", eventMap))
 	// Tags
 	value, found := eventMap["tags"]
 
