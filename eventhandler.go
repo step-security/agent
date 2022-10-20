@@ -139,7 +139,16 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 		eventHandler.procMutex.Unlock()
 
 		if event.Euid == "0" {
-			tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
+			tool := Tool{}
+			image := eventHandler.GetContainerByPid(event.Pid)
+			if image == "" {
+				if event.Exe != "" {
+					tool = *eventHandler.GetToolChain(event.PPid, event.Exe)
+				}
+
+			} else {
+				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
+			}
 			json, err := json.MarshalIndent(tool, "", "    ")
 			if err != nil {
 				WriteLog(fmt.Sprintf("sudo process started: %+v, error in marshalling toolchain: %v", proc, err))
