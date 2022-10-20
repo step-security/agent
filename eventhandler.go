@@ -136,18 +136,21 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
+		proc := eventHandler.ProcessMap[event.Pid]
+		eventHandler.procMutex.Unlock()
+
 		if event.Euid == "0" {
 			tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
 			json, err := json.MarshalIndent(tool, "", "    ")
 			if err != nil {
-				WriteLog(fmt.Sprintf("sudo process started: %+v, error in marshalling toolchain: %v", eventHandler.ProcessMap[event.Pid], err))
+				WriteLog(fmt.Sprintf("sudo process started: %+v, error in marshalling toolchain: %v", proc, err))
 			} else {
-				WriteLog(fmt.Sprintf("sudo process started: %+v, processtree: %s", eventHandler.ProcessMap[event.Pid], string(json)))
+				WriteLog(fmt.Sprintf("sudo process started: %+v, processtree: %s", proc, string(json)))
 			}
 		}
+	} else {
+		eventHandler.procMutex.Unlock()
 	}
-
-	eventHandler.procMutex.Unlock()
 }
 
 /*
