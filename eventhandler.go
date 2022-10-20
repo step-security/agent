@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -138,13 +139,13 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 		eventHandler.procMutex.Unlock()
 
 		if event.Euid == "0" {
-			//tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
-			//json, err := json.MarshalIndent(tool, "", "    ")
-			//if err != nil {
-			//WriteLog(fmt.Sprintf("sudo process started: %+v, error in marshalling toolchain: %v", proc, err))
-			//} else {
-			WriteLog(fmt.Sprintf("sudo process started: %+v, processtree: %s", proc, ""))
-			//}
+			tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
+			json, err := json.MarshalIndent(tool, "", "    ")
+			if err != nil {
+				WriteLog(fmt.Sprintf("sudo process started: %+v, error in marshalling toolchain: %v", proc, err))
+			} else {
+				WriteLog(fmt.Sprintf("sudo process started: %+v, processtree: %s", proc, string(json)))
+			}
 		}
 	} else {
 		eventHandler.procMutex.Unlock()
@@ -344,8 +345,8 @@ func getProgramChecksum(path string) (string, error) {
 }
 
 func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
-	checksum, _ := getProgramChecksum(exe)
-	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
+	//checksum, _ := getProgramChecksum(exe)
+	tool := Tool{Name: filepath.Base(exe), SHA256: "123"}
 
 	// In some cases the process has already exited, so get from map first
 	eventHandler.procMutex.Lock()
