@@ -134,6 +134,9 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
+		if event.Euid == "0" {
+			WriteLog(fmt.Sprintf("sudo process started: %+v", eventHandler.ProcessMap[event.Pid]))
+		}
 	}
 
 	eventHandler.procMutex.Unlock()
