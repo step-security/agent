@@ -134,7 +134,6 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
-		proc := *eventHandler.ProcessMap[event.Pid]
 		eventHandler.procMutex.Unlock()
 
 		if event.Euid == "0" {
@@ -142,7 +141,7 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 			if image == "" {
 				if event.Exe != "" {
 					if eventHandler.IsStartedByRunner(event.PPid, event.Exe) {
-						WriteLog(fmt.Sprintf("sudo process started: %+v", proc))
+						WriteLog(fmt.Sprintf("sudo process started: Exe: %s, Arguments: %v", event.Exe, event.ProcessArguments))
 					}
 				}
 			}
