@@ -93,17 +93,15 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 
 			if isFromDifferentProcess {
 				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
-				if !strings.Contains(event.FileName, "node_modules/") { // node_modules folder has overwrites by design, even has .cs files in some cases. Need a better way to handle that
-					counter, found := eventHandler.FileOverwriteCounterMap[event.Exe]
-					if !found || counter < 3 {
-						checksum, err := getProgramChecksum(event.Exe)
-						if err == nil {
-							WriteLog(fmt.Sprintf("[Source code overwritten] file: %s syscall: %s by exe: %s [%s] Timestamp: %s", event.FileName, event.Syscall, event.Exe, checksum, event.Timestamp.Format("2006-01-02T15:04:05.999999999Z")))
-							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
-						}
-
-						eventHandler.FileOverwriteCounterMap[event.Exe]++
+				counter, found := eventHandler.FileOverwriteCounterMap[event.Exe]
+				if !found || counter < 3 {
+					checksum, err := getProgramChecksum(event.Exe)
+					if err == nil {
+						WriteLog(fmt.Sprintf("[Source code overwritten] file: %s syscall: %s by exe: %s [%s] Timestamp: %s", event.FileName, event.Syscall, event.Exe, checksum, event.Timestamp.Format("2006-01-02T15:04:05.999999999Z")))
+						// WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
 					}
+
+					eventHandler.FileOverwriteCounterMap[event.Exe]++
 				}
 			}
 		}
@@ -113,15 +111,9 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 }
 
 func isSourceCodeFile(fileName string) bool {
-	ext := path.Ext(fileName)
-	// https://docs.github.com/en/get-started/learning-about-github/github-language-support
-	// TODO: Add js & ts back. node makes change to js files as part of downloading/ setting up dependencies
-	// TODO: Add more extensions
-	sourceCodeExtensions := []string{".c", ".cpp", ".cs", ".go", ".java"}
-	for _, extension := range sourceCodeExtensions {
-		if ext == extension {
-			return true
-		}
+	// If it has an extension or might be a Dockerfile
+	if strings.Contains(fileName, ".") || strings.Contains(fileName, "Dockerfile") {
+		return true
 	}
 
 	return false
