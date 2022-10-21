@@ -240,8 +240,6 @@ func GetContainerIdByPid(cgroupPath string) string {
 		return ""
 	}
 
-	//WriteLog(fmt.Sprintf("content for cgrouppath: %s : %s", cgroupPath, content))
-
 	for _, line := range strings.Split(string(content), "\n") {
 		parts := strings.Split(line, ":")
 		if len(parts) > 2 && parts[1] == "memory" {
@@ -372,8 +370,8 @@ func (eventHandler *EventHandler) IsStartedByRunner(ppid, exe string) bool {
 }
 
 func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
-	//checksum, _ := getProgramChecksum(exe)
-	tool := Tool{Name: filepath.Base(exe), SHA256: "123"}
+	checksum, _ := getProgramChecksum(exe)
+	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
 
 	// In some cases the process has already exited, so get from map first
 	eventHandler.procMutex.Lock()
