@@ -44,6 +44,7 @@ type Event struct {
 	Pid               string
 	ProcessArguments  []string
 	PPid              string
+	Euid              string
 	Timestamp         time.Time
 	EventType         string
 	Status            string
@@ -68,6 +69,7 @@ func (p *ProcessMonitor) PrepareEvent(sequence int, eventMap map[string]interfac
 			p.Events[sequence].Exe = getValue("exe", eventMap)
 			p.Events[sequence].Pid = getValue("pid", eventMap)
 			p.Events[sequence].PPid = getValue("ppid", eventMap)
+			p.Events[sequence].Euid = getValue("euid", eventMap)
 			timestamp, err := time.Parse("2006-01-02 15:04:05.999999999 +0000 UTC", getValue("@timestamp", eventMap))
 			if err != nil {
 				timestamp = time.Now().UTC()
