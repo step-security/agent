@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -139,21 +138,13 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 		eventHandler.procMutex.Unlock()
 
 		if event.Euid == "0" {
-			tool := Tool{}
 			image := eventHandler.GetContainerByPid(event.Pid)
 			if image == "" {
 				if event.Exe != "" {
-					tool = *eventHandler.GetToolChain(event.PPid, event.Exe)
+					if eventHandler.IsStartedByRunner(event.PPid, event.Exe) {
+						WriteLog(fmt.Sprintf("sudo process started: %+v", proc))
+					}
 				}
-
-			} else {
-				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
-			}
-			json, err := json.MarshalIndent(tool, "", "    ")
-			if err != nil {
-				WriteLog(fmt.Sprintf("sudo process started: %+v, error in marshalling toolchain: %v", proc, err))
-			} else {
-				WriteLog(fmt.Sprintf("sudo process started: %+v, processtree: %s", proc, string(json)))
 			}
 		}
 	} else {
@@ -351,6 +342,36 @@ func getProgramChecksum(path string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func (eventHandler *EventHandler) IsStartedByRunner(ppid, exe string) bool {
+
+	if strings.Contains(exe, "Runner.Worker") {
+		return true
+	}
+
+	// In some cases the process has already exited, so get from map first
+	eventHandler.procMutex.Lock()
+	parentProcess, found := eventHandler.ProcessMap[ppid]
+	eventHandler.procMutex.Unlock()
+
+	if found {
+		return eventHandler.IsStartedByRunner(parentProcess.PPid, parentProcess.Exe)
+	}
+
+	// If not in map, may be long running, so get from OS
+	parentProcessId, err := getParentProcessId(ppid)
+	if err != nil {
+		return false
+	}
+
+	path, err := getProcessExe(ppid)
+	if err != nil {
+		return false
+	}
+
+	return eventHandler.IsStartedByRunner(fmt.Sprintf("%d", parentProcessId), path)
+
 }
 
 func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
