@@ -237,7 +237,7 @@ func (eventHandler *EventHandler) HandleEvent(event *Event) {
 func GetContainerIdByPid(cgroupPath string) string {
 	content, err := ioutil.ReadFile(cgroupPath)
 	if err != nil {
-		WriteLog(fmt.Sprintf("error reading cgrouppath: %s : %v", cgroupPath, err))
+		// WriteLog(fmt.Sprintf("error reading cgrouppath: %s : %v", cgroupPath, err))
 		return ""
 	}
 
@@ -293,8 +293,6 @@ func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
 	containerId := GetContainerIdByPid(cgroupPath)
 	if containerId == "" {
 		return ""
-	} else {
-		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
 	// docker prints first 12 characters in the log
@@ -319,7 +317,7 @@ func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
 		if strings.Compare(pid, fmt.Sprintf("%d", json.State.Pid)) == 0 {
 			procContainer = container.Image
 		} else if containerId == container.ID {
-			WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", container.ID, pid))
+			// WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", container.ID, pid))
 			procContainer = container.Image
 		}
 	}
