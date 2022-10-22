@@ -111,7 +111,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			if config.EgressPolicy == "block" {
 				config.EgressPolicy = "audit"
 			}
-			WriteAnnotation(fmt.Sprintf("%s To restrict outbound traffic, and view insights, please start a free trial for private repos at https://stepsecurity.io", StepSecurityAnnotationPrefix))
+			WriteAnnotation(fmt.Sprintf("%s Subscription required for private repositories. Please start a free trial at https://stepsecurity.io", StepSecurityAnnotationPrefix))
 		}
 	}
 
