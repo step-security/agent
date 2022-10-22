@@ -80,30 +80,6 @@ func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, po
 
 }
 
-func (apiclient *ApiClient) sendFileEvent(correlationId, repo, fileType string, timestamp time.Time, tool Tool) error {
-
-	if !apiclient.DisableTelemetry || apiclient.EgressPolicy == EgressPolicyAudit {
-		fileEvent := &FileEvent{}
-
-		fileEvent.FileType = fileType
-		fileEvent.TimeStamp = timestamp
-		fileEvent.Tool = tool
-
-		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/fileevent", apiclient.APIURL, repo, correlationId)
-
-		return apiclient.sendApiRequest("POST", url, fileEvent)
-	}
-	return nil
-
-}
-
-/*func (apiclient *ApiClient) sendArtifact(correlationId, repo string, artifact artifact.Artifact) error {
-
-	url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/artifact", apiclient.APIURL, repo, correlationId)
-
-	return apiclient.sendApiRequest("POST", url, artifact)
-}*/
-
 func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{}) error {
 
 	jsonData, _ := json.Marshal(body)

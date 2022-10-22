@@ -60,26 +60,8 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	// Uncomment to log file writes (only uncomment in INT env)
 	// WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
 
-	_, found := eventHandler.ProcessFileMap[event.Pid]
-	fileType := ""
-	if !found {
-		// TODO: Improve this logic to monitor dependencies across languages
-		if strings.Contains(event.FileName, "/node_modules/") && strings.HasSuffix(event.FileName, ".js") {
-			fileType = "Dependencies"
-
-		} else if strings.Contains(event.FileName, ".git/objects") {
-			fileType = "Source Code"
-		}
-
-		if fileType != "" {
-			tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
-			eventHandler.ApiClient.sendFileEvent(eventHandler.CorrelationId, eventHandler.Repo, fileType, event.Timestamp, tool)
-			eventHandler.ProcessFileMap[event.Pid] = true
-		}
-	}
-
 	if isSourceCodeFile(event.FileName) {
-		_, found = eventHandler.SourceCodeMap[event.FileName]
+		_, found := eventHandler.SourceCodeMap[event.FileName]
 		if !found {
 			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
 		}
