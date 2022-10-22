@@ -104,6 +104,17 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	sudo := Sudo{}
 	var ipAddressEndpoints []ipAddressEndpoint
 
+	// if this is a private repo
+	if config.Private {
+		isAuthorized := apiclient.getAuthorizationStatus(config.Repo)
+		if !isAuthorized {
+			if config.EgressPolicy == "block" {
+				config.EgressPolicy = "audit"
+			}
+			WriteAnnotation(fmt.Sprintf("%s To restrict outbound traffic, and view insights, please start a free trial for private repos at https://stepsecurity.io", StepSecurityAnnotationPrefix))
+		}
+	}
+
 	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
 		for domainName, endpoints := range allowedEndpoints {
