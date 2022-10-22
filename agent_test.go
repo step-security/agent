@@ -185,6 +185,11 @@ func TestRun(t *testing.T) {
 			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: nil, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
+
+		{name: "success disable sudo", args: args{ctxCancelDuration: 35, configFilePath: "./testfiles/agent-disable-sudo.json",
+			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
 	}
 	_, ciTest := os.LookupEnv("CI")
 	fmt.Printf("ci-test: %t\n", ciTest)
