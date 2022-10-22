@@ -49,7 +49,11 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("Rules deleted")
 
 	// files modified in working directory
-	r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", "/home/runner", fileMonitorTag))
+	workingDirectory := p.WorkingDirectory
+	if len(workingDirectory) == 0 {
+		workingDirectory = "/home/runner"
+	}
+	r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag))
 
 	actualBytes, _ := rule.Build(r)
 
@@ -58,7 +62,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to add audit rule")
 	}
 
-	WriteLog("File monitor added")
+	WriteLog(fmt.Sprintf("File monitor added for %s", workingDirectory))
 
 	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/home/agent", fileMonitorTag))
 	actualBytes, _ = rule.Build(r)
