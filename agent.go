@@ -78,7 +78,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	if config.Private {
 		isActive := apiclient.getSubscriptionStatus(config.Repo)
 		if !isActive {
-			config.EgressPolicy = "audit"
+			config.EgressPolicy = EgressPolicyAudit
 			config.DisableSudo = false
 			apiclient.DisableTelemetry = true
 			WriteAnnotation("StepSecurity Harden Runner disabled. A subscription is required for private repositories. Please start a free trial at https://stepsecurity.io")
