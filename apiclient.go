@@ -80,6 +80,29 @@ func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, po
 
 }
 
+func (apiclient *ApiClient) getSubscriptionStatus(repo string) bool {
+
+	url := fmt.Sprintf("%s/github/%s/actions/subscription", apiclient.APIURL, repo)
+
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		return true
+	}
+
+	resp, err := apiclient.Client.Do(req)
+
+	if err != nil {
+		return true
+	}
+
+	if resp.StatusCode == 403 {
+		return false
+	}
+
+	return true
+}
+
 func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{}) error {
 
 	jsonData, _ := json.Marshal(body)
