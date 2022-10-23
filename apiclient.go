@@ -80,11 +80,11 @@ func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, po
 
 }
 
-func (apiclient *ApiClient) getAuthorizationStatus(repo string) bool {
+func (apiclient *ApiClient) getSubscriptionStatus(repo string) bool {
 
-	/*url := fmt.Sprintf("%s/github/%s/actions/jobs/isauthorized", apiclient.APIURL, repo)
+	url := fmt.Sprintf("%s/github/%s/actions/subscription", apiclient.APIURL, repo)
 
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 
 	if err != nil {
 		return true
@@ -98,9 +98,9 @@ func (apiclient *ApiClient) getAuthorizationStatus(repo string) bool {
 
 	if resp.StatusCode == 403 {
 		return false
-	}*/
+	}
 
-	return false
+	return true
 }
 
 func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{}) error {

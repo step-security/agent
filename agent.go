@@ -74,6 +74,17 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 	WriteLog("\n")
 
+	// if this is a private repo
+	if config.Private {
+		isActive := apiclient.getSubscriptionStatus(config.Repo)
+		if !isActive {
+			config.EgressPolicy = "audit"
+			config.DisableSudo = false
+			apiclient.DisableTelemetry = true
+			WriteAnnotation("StepSecurity Harden Runner disabled. A subscription is required for private repositories. Please start a free trial at https://stepsecurity.io")
+		}
+	}
+
 	Cache := InitCache(config.EgressPolicy)
 
 	allowedEndpoints := addImplicitEndpoints(config.Endpoints, config.DisableTelemetry)
@@ -103,17 +114,6 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	dnsConfig := DnsConfig{}
 	sudo := Sudo{}
 	var ipAddressEndpoints []ipAddressEndpoint
-
-	// if this is a private repo
-	if config.Private {
-		isAuthorized := apiclient.getAuthorizationStatus(config.Repo)
-		if !isAuthorized {
-			if config.EgressPolicy == "block" {
-				config.EgressPolicy = "audit"
-			}
-			WriteAnnotation(fmt.Sprintf("%s Subscription required for private repositories. Please start a free trial at https://stepsecurity.io", StepSecurityAnnotationPrefix))
-		}
-	}
 
 	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
