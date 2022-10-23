@@ -48,24 +48,27 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 
 	WriteLog("Rules deleted")
 
-	// files modified in working directory
-	workingDirectory := p.WorkingDirectory
-	if len(workingDirectory) == 0 {
-		workingDirectory = "/home/runner"
-	}
-	r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag))
+	if !p.DisableFileMonitoring {
 
+		// files modified in working directory
+		workingDirectory := p.WorkingDirectory
+		if len(workingDirectory) == 0 {
+			workingDirectory = "/home/runner"
+		}
+		r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag))
+
+		actualBytes, _ := rule.Build(r)
+
+		if err = client.AddRule(actualBytes); err != nil {
+			WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
+			errc <- errors.Wrap(err, "failed to add audit rule")
+		}
+
+		WriteLog(fmt.Sprintf("File monitor added for %s", workingDirectory))
+	}
+
+	r, _ := flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/home/agent", fileMonitorTag))
 	actualBytes, _ := rule.Build(r)
-
-	if err = client.AddRule(actualBytes); err != nil {
-		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))
-		errc <- errors.Wrap(err, "failed to add audit rule")
-	}
-
-	WriteLog(fmt.Sprintf("File monitor added for %s", workingDirectory))
-
-	r, _ = flags.Parse(fmt.Sprintf("-w %s -p w -k %s", "/home/agent", fileMonitorTag))
-	actualBytes, _ = rule.Build(r)
 
 	if err = client.AddRule(actualBytes); err != nil {
 		WriteLog(fmt.Sprintf("failed to add audit rule %v", err))

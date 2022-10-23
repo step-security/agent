@@ -14,13 +14,14 @@ const (
 )
 
 type ProcessMonitor struct {
-	CorrelationId    string
-	Repo             string
-	ApiClient        *ApiClient
-	DNSProxy         *DNSProxy
-	WorkingDirectory string
-	Events           map[int]*Event
-	mutex            sync.RWMutex
+	CorrelationId         string
+	Repo                  string
+	ApiClient             *ApiClient
+	DNSProxy              *DNSProxy
+	WorkingDirectory      string
+	DisableFileMonitoring bool
+	Events                map[int]*Event
+	mutex                 sync.RWMutex
 }
 
 type Process struct {

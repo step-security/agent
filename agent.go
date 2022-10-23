@@ -81,6 +81,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			config.EgressPolicy = EgressPolicyAudit
 			config.DisableSudo = false
 			apiclient.DisableTelemetry = true
+			config.DisableFileMonitoring = true
 			WriteAnnotation("StepSecurity Harden Runner disabled. A subscription is required for private repositories. Please start a free trial at https://stepsecurity.io")
 		}
 	}
@@ -106,7 +107,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	// start proc mon
 	if cmd == nil {
 		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo,
-			ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory, DNSProxy: &dnsProxy}
+			ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory, DisableFileMonitoring: config.DisableFileMonitoring, DNSProxy: &dnsProxy}
 		go procMon.MonitorProcesses(errc)
 		WriteLog("started process monitor")
 	}
