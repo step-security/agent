@@ -65,14 +65,26 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	apiclient := &ApiClient{Client: &http.Client{}, APIURL: config.APIURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy}
+	apiclient := &ApiClient{Client: &http.Client{Timeout: 3 * time.Second}, APIURL: config.APIURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy}
 
 	// TODO: pass in an iowriter/ use log library
-	WriteLog(fmt.Sprintf("read config \n %v", config))
+	WriteLog(fmt.Sprintf("read config \n %+v", config))
 	WriteLog("\n")
 
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 	WriteLog("\n")
+
+	// if this is a private repo
+	if config.Private {
+		isActive := apiclient.getSubscriptionStatus(config.Repo)
+		if !isActive {
+			config.EgressPolicy = EgressPolicyAudit
+			config.DisableSudo = false
+			apiclient.DisableTelemetry = true
+			config.DisableFileMonitoring = true
+			WriteAnnotation("StepSecurity Harden Runner disabled. A subscription is required for private repositories. Please start a free trial at https://stepsecurity.io")
+		}
+	}
 
 	Cache := InitCache(config.EgressPolicy)
 
@@ -95,13 +107,13 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	// start proc mon
 	if cmd == nil {
 		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo,
-			ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory, DNSProxy: &dnsProxy}
+			ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory, DisableFileMonitoring: config.DisableFileMonitoring, DNSProxy: &dnsProxy}
 		go procMon.MonitorProcesses(errc)
 		WriteLog("started process monitor")
 	}
 
 	dnsConfig := DnsConfig{}
-
+	sudo := Sudo{}
 	var ipAddressEndpoints []ipAddressEndpoint
 
 	// hydrate dns cache
@@ -112,7 +124,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			if err != nil {
 				WriteLog(fmt.Sprintf("Error resolving allowed domain %v", err))
 				WriteAnnotation(fmt.Sprintf("%s Reverting agent since allowed endpoint %s could not be resolved", StepSecurityAnnotationPrefix, strings.Trim(domainName, ".")))
-				RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+				RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
 				return err
 			}
 			for _, endpoint := range endpoints {
@@ -126,7 +138,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	// Change DNS config on host, causes processes to use agent's DNS proxy
 	if err := dnsConfig.SetDNSServer(cmd, resolvdConfigPath, tempDir); err != nil {
 		WriteLog(fmt.Sprintf("Error setting DNS server %v", err))
-		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
 		return err
 	}
 
@@ -136,7 +148,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	// Change DNS for docker, causes process in containers to use agent's DNS proxy
 	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
 		WriteLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
-		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
 		return err
 	}
 
@@ -159,7 +171,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		// Add logging to firewall, including NFLOG rules
 		if err := AddAuditRules(iptables); err != nil {
 			WriteLog(fmt.Sprintf("Error adding firewall rules %v", err))
-			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
 			return err
 		}
 
@@ -182,11 +194,20 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 		if err := addBlockRulesForGitHubHostedRunner(iptables, ipAddressEndpoints); err != nil {
 			WriteLog(fmt.Sprintf("Error setting firewall for allowed domains %v", err))
-			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
 			return err
 		}
 
 		go refreshDNSEntries(ctx, iptables, allowedEndpoints, &dnsProxy)
+	}
+
+	if config.DisableSudo {
+		err := sudo.disableSudo(tempDir)
+		if err != nil {
+			WriteAnnotation(fmt.Sprintf("%s Unable to disable sudo %v", StepSecurityAnnotationPrefix, err))
+		} else {
+			WriteLog("disabled sudo")
+		}
 	}
 
 	WriteLog("done")
@@ -200,7 +221,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			return nil
 		case e := <-errc:
 			WriteLog(fmt.Sprintf("Error in Initialization %v", e))
-			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig)
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
 			return e
 
 		}
@@ -284,7 +305,7 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 }
 
 func RevertChanges(iptables *Firewall, nflog AgentNflogger,
-	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string, dnsConfig DnsConfig) {
+	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string, dnsConfig DnsConfig, sudo Sudo) {
 	err := RevertFirewallChanges(iptables)
 	if err != nil {
 		WriteLog(fmt.Sprintf("Error in RevertChanges %v", err))
@@ -296,6 +317,10 @@ func RevertChanges(iptables *Firewall, nflog AgentNflogger,
 	err = dnsConfig.RevertDockerDNSServer(cmd, dockerDaemonConfigPath)
 	if err != nil {
 		WriteLog(fmt.Sprintf("Error in reverting docker DNS server changes %v", err))
+	}
+	err = sudo.revertDisableSudo()
+	if err != nil {
+		WriteLog(fmt.Sprintf("Error in reverting sudo changes %v", err))
 	}
 	WriteLog("Reverted changes")
 }

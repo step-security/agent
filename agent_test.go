@@ -138,6 +138,9 @@ func TestRun(t *testing.T) {
 	httpmock.RegisterResponder("GET", "https://dns.google/resolve", // no query params to match all other requests
 		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
 
+	httpmock.RegisterResponder("GET", "https://apiurl/v1/github/owner/repo/actions/subscription",
+		httpmock.NewStringResponder(403, ""))
+
 	tests := []struct {
 		name    string
 		args    args
@@ -185,6 +188,15 @@ func TestRun(t *testing.T) {
 			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
 			iptables: nil, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
 			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
+
+		{name: "success disable sudo", args: args{ctxCancelDuration: 35, configFilePath: "./testfiles/agent-disable-sudo.json",
+			hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}"), ciTestOnly: true}, wantErr: false},
+
+		{name: "private repo no subscription", args: args{ctxCancelDuration: 2, configFilePath: "./testfiles/agent-private-repo.json", hostDNSServer: &mockDNSServer{}, dockerDNSServer: &mockDNSServer{},
+			iptables: &Firewall{&MockIPTables{}}, nflog: &MockAgentNflogger{}, cmd: &MockCommand{}, resolvdConfigPath: createTempFileWithContents(""),
+			dockerDaemonConfigPath: createTempFileWithContents("{}")}, wantErr: false},
 	}
 	_, ciTest := os.LookupEnv("CI")
 	fmt.Printf("ci-test: %t\n", ciTest)

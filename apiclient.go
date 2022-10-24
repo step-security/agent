@@ -80,29 +80,28 @@ func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, po
 
 }
 
-func (apiclient *ApiClient) sendFileEvent(correlationId, repo, fileType string, timestamp time.Time, tool Tool) error {
+func (apiclient *ApiClient) getSubscriptionStatus(repo string) bool {
 
-	if !apiclient.DisableTelemetry || apiclient.EgressPolicy == EgressPolicyAudit {
-		fileEvent := &FileEvent{}
+	url := fmt.Sprintf("%s/github/%s/actions/subscription", apiclient.APIURL, repo)
 
-		fileEvent.FileType = fileType
-		fileEvent.TimeStamp = timestamp
-		fileEvent.Tool = tool
+	req, err := http.NewRequest("GET", url, nil)
 
-		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/fileevent", apiclient.APIURL, repo, correlationId)
-
-		return apiclient.sendApiRequest("POST", url, fileEvent)
+	if err != nil {
+		return true
 	}
-	return nil
 
+	resp, err := apiclient.Client.Do(req)
+
+	if err != nil {
+		return true
+	}
+
+	if resp.StatusCode == 403 {
+		return false
+	}
+
+	return true
 }
-
-/*func (apiclient *ApiClient) sendArtifact(correlationId, repo string, artifact artifact.Artifact) error {
-
-	url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/artifact", apiclient.APIURL, repo, correlationId)
-
-	return apiclient.sendApiRequest("POST", url, artifact)
-}*/
 
 func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{}) error {
 

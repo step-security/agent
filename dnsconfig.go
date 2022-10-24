@@ -13,8 +13,9 @@ import (
 )
 
 type DnsConfig struct {
-	ResolveConfigBackUpPath string
-	DockerConfigBackUpPath  string
+	ResolveConfigBackUpPath  string
+	DockerConfigBackUpPath   string
+	ShouldDeleteDockerConfig bool
 }
 
 const (
@@ -129,7 +130,7 @@ func (d *DnsConfig) SetDNSServer(cmd Command, resolvdConfigPath, tempDir string)
 
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error flushing cache: %v", err))
+		WriteLog(fmt.Sprintf("error flushing cache: %v", err))
 	}
 
 	return nil
@@ -158,13 +159,18 @@ func copy(src, dst string) error {
 }
 
 func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) error {
-	d.DockerConfigBackUpPath = path.Join(tempDir, "daemon.json")
-	err := copy(configPath, d.DockerConfigBackUpPath)
-	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error backing up docker config: %v", err))
+	if _, err := os.Stat(configPath); err == nil {
+		d.DockerConfigBackUpPath = path.Join(tempDir, "daemon.json")
+		err := copy(configPath, d.DockerConfigBackUpPath)
+		if err != nil {
+			return fmt.Errorf(fmt.Sprintf("error backing up docker config: %v", err))
+		}
+	} else {
+		d.ShouldDeleteDockerConfig = true
 	}
+
 	mock := cmd != nil
-	err = updateDockerConfig(configPath)
+	err := updateDockerConfig(configPath)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("error updating to docker daemon config: %v", err))
 	}
@@ -192,18 +198,24 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 }
 
 func (d *DnsConfig) RevertDockerDNSServer(cmd Command, configPath string) error {
-	if len(d.DockerConfigBackUpPath) > 0 {
-
-		err := copy(d.DockerConfigBackUpPath, configPath)
-		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("error recovering docker config: %v", err))
+	if len(d.DockerConfigBackUpPath) > 0 || d.ShouldDeleteDockerConfig {
+		if len(d.DockerConfigBackUpPath) > 0 {
+			err := copy(d.DockerConfigBackUpPath, configPath)
+			if err != nil {
+				return fmt.Errorf(fmt.Sprintf("error recovering docker config: %v", err))
+			}
+		} else if d.ShouldDeleteDockerConfig {
+			err := os.Remove(configPath)
+			if err != nil {
+				return fmt.Errorf(fmt.Sprintf("error deleting docker config: %v", err))
+			}
 		}
 
 		if cmd == nil {
 			cmd = exec.Command("/bin/sh", "-c", "sudo systemctl daemon-reload && sudo systemctl restart docker")
 		}
 
-		err = cmd.Run()
+		err := cmd.Run()
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("error restarting docker: %v", err))
 		}

@@ -11,14 +11,17 @@ import (
 )
 
 type config struct {
-	Repo             string
-	CorrelationId    string
-	RunId            string
-	WorkingDirectory string
-	APIURL           string
-	Endpoints        map[string][]Endpoint
-	EgressPolicy     string
-	DisableTelemetry bool
+	Repo                  string
+	CorrelationId         string
+	RunId                 string
+	WorkingDirectory      string
+	APIURL                string
+	Endpoints             map[string][]Endpoint
+	EgressPolicy          string
+	DisableTelemetry      bool
+	DisableSudo           bool
+	DisableFileMonitoring bool
+	Private               bool
 }
 
 type Endpoint struct {
@@ -27,14 +30,17 @@ type Endpoint struct {
 }
 
 type configFile struct {
-	Repo             string `json:"repo"`
-	CorrelationId    string `json:"correlation_id"`
-	RunId            string `json:"run_id"`
-	WorkingDirectory string `json:"working_directory"`
-	APIURL           string `json:"api_url"`
-	AllowedEndpoints string `json:"allowed_endpoints"`
-	EgressPolicy     string `json:"egress_policy"`
-	DisableTelemetry bool   `json:"disable_telemetry"`
+	Repo                  string `json:"repo"`
+	CorrelationId         string `json:"correlation_id"`
+	RunId                 string `json:"run_id"`
+	WorkingDirectory      string `json:"working_directory"`
+	APIURL                string `json:"api_url"`
+	AllowedEndpoints      string `json:"allowed_endpoints"`
+	EgressPolicy          string `json:"egress_policy"`
+	DisableTelemetry      bool   `json:"disable_telemetry"`
+	DisableSudo           bool   `json:"disable_sudo"`
+	DisableFileMonitoring bool   `json:"disable_file_monitoring"`
+	Private               bool   `json:"private"`
 }
 
 // init reads the config file for the agent and initializes config settings
@@ -58,6 +64,9 @@ func (c *config) init(configFilePath string) error {
 	c.Endpoints = parseEndpoints(configFile.AllowedEndpoints)
 	c.EgressPolicy = configFile.EgressPolicy
 	c.DisableTelemetry = configFile.DisableTelemetry
+	c.DisableSudo = configFile.DisableSudo
+	c.DisableFileMonitoring = configFile.DisableFileMonitoring
+	c.Private = configFile.Private
 	return nil
 }
 

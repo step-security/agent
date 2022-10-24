@@ -60,26 +60,8 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	// Uncomment to log file writes (only uncomment in INT env)
 	// WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
 
-	_, found := eventHandler.ProcessFileMap[event.Pid]
-	fileType := ""
-	if !found {
-		// TODO: Improve this logic to monitor dependencies across languages
-		if strings.Contains(event.FileName, "/node_modules/") && strings.HasSuffix(event.FileName, ".js") {
-			fileType = "Dependencies"
-
-		} else if strings.Contains(event.FileName, ".git/objects") {
-			fileType = "Source Code"
-		}
-
-		if fileType != "" {
-			tool := *eventHandler.GetToolChain(event.PPid, event.Exe)
-			eventHandler.ApiClient.sendFileEvent(eventHandler.CorrelationId, eventHandler.Repo, fileType, event.Timestamp, tool)
-			eventHandler.ProcessFileMap[event.Pid] = true
-		}
-	}
-
 	if isSourceCodeFile(event.FileName) {
-		_, found = eventHandler.SourceCodeMap[event.FileName]
+		_, found := eventHandler.SourceCodeMap[event.FileName]
 		if !found {
 			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
 		}
@@ -93,17 +75,15 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 
 			if isFromDifferentProcess {
 				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
-				if !strings.Contains(event.FileName, "node_modules/") { // node_modules folder has overwrites by design, even has .cs files in some cases. Need a better way to handle that
-					counter, found := eventHandler.FileOverwriteCounterMap[event.Exe]
-					if !found || counter < 3 {
-						checksum, err := getProgramChecksum(event.Exe)
-						if err == nil {
-							WriteLog(fmt.Sprintf("[Source code overwritten] file: %s syscall: %s by exe: %s [%s] Timestamp: %s", event.FileName, event.Syscall, event.Exe, checksum, event.Timestamp.Format("2006-01-02T15:04:05.999999999Z")))
-							WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
-						}
-
-						eventHandler.FileOverwriteCounterMap[event.Exe]++
+				counter, found := eventHandler.FileOverwriteCounterMap[event.Exe]
+				if !found || counter < 3 {
+					checksum, err := getProgramChecksum(event.Exe)
+					if err == nil {
+						WriteLog(fmt.Sprintf("[Source code overwritten] file: %s syscall: %s by exe: %s [%s] Timestamp: %s", event.FileName, event.Syscall, event.Exe, checksum, event.Timestamp.Format("2006-01-02T15:04:05.999999999Z")))
+						// WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
 					}
+
+					eventHandler.FileOverwriteCounterMap[event.Exe]++
 				}
 			}
 		}
@@ -113,15 +93,9 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 }
 
 func isSourceCodeFile(fileName string) bool {
-	ext := path.Ext(fileName)
-	// https://docs.github.com/en/get-started/learning-about-github/github-language-support
-	// TODO: Add js & ts back. node makes change to js files as part of downloading/ setting up dependencies
-	// TODO: Add more extensions
-	sourceCodeExtensions := []string{".c", ".cpp", ".cs", ".go", ".java"}
-	for _, extension := range sourceCodeExtensions {
-		if ext == extension {
-			return true
-		}
+	// If it has an extension or might be a Dockerfile
+	if strings.Contains(fileName, ".") || strings.Contains(fileName, "Dockerfile") {
+		return true
 	}
 
 	return false
@@ -134,9 +108,21 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
-	}
+		eventHandler.procMutex.Unlock()
 
-	eventHandler.procMutex.Unlock()
+		if event.Euid == "0" {
+			image := eventHandler.GetContainerByPid(event.Pid)
+			if image == "" {
+				if event.Exe != "" {
+					if eventHandler.IsStartedByRunner(event.PPid, event.Exe) {
+						WriteLog(fmt.Sprintf("sudo process started: Exe: %s, Arguments: %v", event.Exe, event.ProcessArguments))
+					}
+				}
+			}
+		}
+	} else {
+		eventHandler.procMutex.Unlock()
+	}
 }
 
 /*
@@ -224,11 +210,9 @@ func (eventHandler *EventHandler) HandleEvent(event *Event) {
 func GetContainerIdByPid(cgroupPath string) string {
 	content, err := ioutil.ReadFile(cgroupPath)
 	if err != nil {
-		WriteLog(fmt.Sprintf("error reading cgrouppath: %s : %v", cgroupPath, err))
+		// WriteLog(fmt.Sprintf("error reading cgrouppath: %s : %v", cgroupPath, err))
 		return ""
 	}
-
-	//WriteLog(fmt.Sprintf("content for cgrouppath: %s : %s", cgroupPath, content))
 
 	for _, line := range strings.Split(string(content), "\n") {
 		parts := strings.Split(line, ":")
@@ -280,8 +264,6 @@ func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
 	containerId := GetContainerIdByPid(cgroupPath)
 	if containerId == "" {
 		return ""
-	} else {
-		WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", containerId, pid))
 	}
 
 	// docker prints first 12 characters in the log
@@ -306,7 +288,7 @@ func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
 		if strings.Compare(pid, fmt.Sprintf("%d", json.State.Pid)) == 0 {
 			procContainer = container.Image
 		} else if containerId == container.ID {
-			WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", container.ID, pid))
+			// WriteLog(fmt.Sprintf("Found containerid: %s for pid: %s", container.ID, pid))
 			procContainer = container.Image
 		}
 	}
@@ -329,6 +311,36 @@ func getProgramChecksum(path string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func (eventHandler *EventHandler) IsStartedByRunner(ppid, exe string) bool {
+
+	if strings.Contains(exe, "Runner.Worker") {
+		return true
+	}
+
+	// In some cases the process has already exited, so get from map first
+	eventHandler.procMutex.Lock()
+	parentProcess, found := eventHandler.ProcessMap[ppid]
+	eventHandler.procMutex.Unlock()
+
+	if found {
+		return eventHandler.IsStartedByRunner(parentProcess.PPid, parentProcess.Exe)
+	}
+
+	// If not in map, may be long running, so get from OS
+	parentProcessId, err := getParentProcessId(ppid)
+	if err != nil {
+		return false
+	}
+
+	path, err := getProcessExe(ppid)
+	if err != nil {
+		return false
+	}
+
+	return eventHandler.IsStartedByRunner(fmt.Sprintf("%d", parentProcessId), path)
+
 }
 
 func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
