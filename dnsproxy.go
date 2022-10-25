@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -113,9 +114,21 @@ func (proxy *DNSProxy) isAllowedDomain(domain string) bool {
 
 func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 	url := fmt.Sprintf("https://dns.google/resolve?name=%s&type=a", domain)
-	resp, err := proxy.ApiClient.Client.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("error in response from dns.google %v", err)
+
+	retryCounter := 0
+	var httpError error
+	var resp *http.Response
+	for retryCounter < 2 {
+		resp, httpError = proxy.ApiClient.Client.Get(url)
+		if httpError != nil {
+			retryCounter++
+		} else {
+			break
+		}
+	}
+
+	if httpError != nil {
+		return nil, fmt.Errorf("error in response from dns.google %v", httpError)
 	}
 
 	defer resp.Body.Close()

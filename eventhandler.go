@@ -189,6 +189,7 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 			}
 			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
 			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", event.Timestamp, tool)
+			WriteLog(fmt.Sprintf("endpoint called ip address:port %s:%s, domain: %s", event.IPAddress, event.Port, reverseLookUp))
 			eventHandler.ProcessConnectionMap[cacheKey] = true
 		}
 	}
