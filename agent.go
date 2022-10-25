@@ -82,7 +82,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			config.DisableSudo = false
 			apiclient.DisableTelemetry = true
 			config.DisableFileMonitoring = true
-			WriteAnnotation("StepSecurity Harden Runner disabled. A subscription is required for private repositories. Please start a free trial at https://stepsecurity.io")
+			WriteAnnotation("StepSecurity Harden Runner is disabled. A subscription is required for private repositories. Please start a free trial at https://www.stepsecurity.io")
 		}
 	}
 
