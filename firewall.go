@@ -10,7 +10,7 @@ import (
 const (
 	filterTable               = "filter"
 	outputChain               = "OUTPUT"
-	dockerUserChain           = "DOCKER_USER"
+	dockerUserChain           = "DOCKER-USER"
 	dockerInterface           = "docker0"
 	defaultInterface          = "eth0"
 	inbound                   = "-i"
