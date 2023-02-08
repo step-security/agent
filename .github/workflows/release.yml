@@ -11,9 +11,9 @@ jobs:
   release:
     permissions:
       contents: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
-    - uses: step-security/harden-runner@v1
+    - uses: step-security/harden-runner@v2
       with:
         allowed-endpoints: 
           api.github.com:443

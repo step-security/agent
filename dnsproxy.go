@@ -191,7 +191,9 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 			// call to api.snapcraft.io is made by snapd in GITHUB_RUNNER
 			// so if it's not present in allowed-domains, traffic to it will get blocked
 			// since it is called by default service, we don't need to add it to annotations
-			if !strings.Contains(domain, "api.snapcraft.io") {
+			// call to docker.io is made by docker. It makes a DNS resolution call, but does not
+			// make a connection to it. This leads to an unnecessary annotation.
+			if !strings.Contains(domain, "api.snapcraft.io") && !strings.Contains(domain, "docker.io") {
 				go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: DNS resolution for domain %s was blocked. This domain is not in the list of allowed-endpoints.", domain))
 			}
 
