@@ -48,6 +48,7 @@ func updateDockerConfig(configPath string) error {
 
 	m["dns"] = []string{dockerDnsServer}
 	m["live-restore"] = true
+	m["userns-remap"] = "runner:runner" // Checkout: https://docs.docker.com/engine/security/userns-remap/#enable-userns-remap-on-the-daemon
 
 	config, err := json.Marshal(m)
 	if err != nil {
