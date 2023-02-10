@@ -13,7 +13,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@629c2de402a417ea7690ca6ce3f33229e27606a5
     - name: Set up Go 
-      uses: actions/setup-go@424fc82d43fa5a37540bae62709ddcc23d9520d4
+      uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568
       with:
         go-version: 1.17
     - name: Run coverage
