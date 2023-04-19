@@ -224,9 +224,6 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	if matchesAnyWildcard {
 		if err := InsertAllowRule(proxy.Iptables, answer.Data, wildcardPort); err != nil {
 			WriteLog(fmt.Sprintf("Error setting firewall for %s:  %v", domain, err))
-			go WriteLog("[DnsProxy] Error while adding endpoint to iptables")
-			// RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
-			// return err
 		}
 
 	}
