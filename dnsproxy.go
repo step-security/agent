@@ -20,8 +20,11 @@ type DNSProxy struct {
 	ApiClient            *ApiClient
 	EgressPolicy         string
 	AllowedEndpoints     map[string][]Endpoint
+	WildCardEndpoints    map[string][]Endpoint
 	ReverseIPLookup      map[string]string
 	ReverseIPLookupMutex sync.RWMutex
+
+	Iptables *Firewall
 }
 
 type DNSResponse struct {
@@ -179,13 +182,18 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		return cacheMsg.Value.Data, nil
 	}
 
+	matchesAnyWildcard := false
+	wildcardPort := ""
+
 	if proxy.EgressPolicy == EgressPolicyBlock {
 		if strings.HasSuffix(domain, ".internal.") {
 			go WriteLog(fmt.Sprintf("unable to resolve internal domains: %s", domain))
 			return "", fmt.Errorf("cannot resolve internal domains")
 		}
 
-		if !proxy.isAllowedDomain(domain) {
+		matchesAnyWildcard, wildcardPort = proxy.matchAnyWildcard(domain)
+
+		if !proxy.isAllowedDomain(domain) && !matchesAnyWildcard {
 			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
 
 			// call to api.snapcraft.io is made by snapd in GITHUB_RUNNER
@@ -213,6 +221,16 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		return "", fmt.Errorf("error in response from dns.google %v", err)
 	}
 
+	if matchesAnyWildcard {
+		if err := InsertAllowRule(proxy.Iptables, answer.Data, wildcardPort); err != nil {
+			WriteLog(fmt.Sprintf("Error setting firewall for %s:  %v", domain, err))
+			go WriteLog("[DnsProxy] Error while adding endpoint to iptables")
+			// RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
+			// return err
+		}
+
+	}
+
 	proxy.Cache.Set(domain, answer)
 
 	go WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d", domain, answer.Data, answer.TTL))
@@ -221,6 +239,15 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	return answer.Data, nil
 
+}
+
+func (proxy *DNSProxy) matchAnyWildcard(domain string) (bool, string) {
+	for wildcard := range proxy.WildCardEndpoints {
+		if matchWildcardDomain(wildcard, domain) {
+			return true, fmt.Sprintf("%v", proxy.WildCardEndpoints[wildcard][0].port)
+		}
+	}
+	return false, ""
 }
 
 func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.RR, error) {
@@ -284,5 +311,24 @@ func startDNSServer(dnsProxy *DNSProxy, server DNSServer, errc chan error) {
 	if err != nil {
 		errc <- errors.Wrap(err, fmt.Sprintf("failed to listen on %v", server))
 	}
+
+}
+
+func matchWildcardDomain(pattern, target string) bool {
+	// pattern: *.github.com
+	// target: h0x0er.github.com
+
+	// TODO: Improve the matching logic.
+
+	result := false
+
+	splits := strings.Split(pattern, "*")
+	if splits[0] != "" {
+		result = strings.HasPrefix(target, splits[0]) && strings.HasSuffix(target, splits[1])
+	} else {
+		result = strings.HasSuffix(target, splits[1])
+	}
+
+	return result
 
 }
