@@ -158,22 +158,26 @@ func TestDNSProxy_auditCacheTTL(t *testing.T) {
 	}
 }
 
-func Test_getDomainFromCloudAppFormat(t *testing.T) {
+func Test_matchWildcardDomain(t *testing.T) {
 	type args struct {
-		domain string
+		pattern string
+		target  string
 	}
 	tests := []struct {
 		name string
 		args args
-		want string
+		want bool
 	}{
-		{name: "prod.cloudflare.com", args: args{domain: "production.cloudflare.docker.com.mma5zatft5wupo5mzspaixdheh.bx.internal.cloudapp.net."}, want: "production.cloudflare.docker.com."},
-		{name: "host.docker.internal", args: args{domain: "host.docker.internal.mma5zatft5wupo5mzspaixdheh.bx.internal.cloudapp.net."}, want: "host.docker.internal."},
+		{name: "abc.github.com", args: args{pattern: "*.github.com", target: "abc.github.com"}, want: true},
+		{name: "xyz.abc.github.com", args: args{pattern: "*.github.com", target: "xyz.abc.github.com"}, want: true},
+		{name: "mno.github.com", args: args{pattern: "*.google.com", target: "abc.github.com"}, want: false},
+		{name: "google1.com", args: args{pattern: "*.google1.com", target: "abc.google.com"}, want: false},
+		{name: "productionresultssa*.blob.core.windows.net", args: args{pattern: "productionresultssa*.blob.core.windows.net", target: "productionresultssa.abc.blob.core.windows.net"}, want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getDomainFromCloudAppFormat(tt.args.domain); got != tt.want {
-				t.Errorf("getDomainFromCloudAppFormat() = %v, want %v", got, tt.want)
+			if got := matchWildcardDomain(tt.args.pattern, tt.args.target); got != tt.want {
+				t.Errorf("matchWildcardDomain() = %v, want %v", got, tt.want)
 			}
 		})
 	}
