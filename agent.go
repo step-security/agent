@@ -289,12 +289,15 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 
 	implicitEndpoints := []Endpoint{
 
-		{domainName: "pipelines.actions.githubusercontent.com", port: 443},     // GitHub
-		{domainName: "artifactcache.actions.githubusercontent.com", port: 443}, // GitHub
-		{domainName: "codeload.github.com", port: 443},                         // GitHub
-		{domainName: "token.actions.githubusercontent.com", port: 443},         // GitHub
-		{domainName: "vstoken.actions.githubusercontent.com", port: 443},       // GitHub
-		{domainName: "vstsmms.actions.githubusercontent.com", port: 443},       // GitHub
+		{domainName: "pipelines.actions.githubusercontent.com", port: 443},           // GitHub
+		{domainName: "artifactcache.actions.githubusercontent.com", port: 443},       // GitHub
+		{domainName: "codeload.github.com", port: 443},                               // GitHub
+		{domainName: "token.actions.githubusercontent.com", port: 443},               // GitHub
+		{domainName: "vstoken.actions.githubusercontent.com", port: 443},             // GitHub
+		{domainName: "vstsmms.actions.githubusercontent.com", port: 443},             // GitHub
+		{domainName: "actions-results-receiver-production.githubapp.com", port: 443}, // GitHub
+		{domainName: "productionresultssa*.blob.core.windows.net", port: 443},        // GitHub
+
 	}
 
 	for key, val := range endpoints {
@@ -306,7 +309,12 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 	}
 
 	for _, endpoint := range implicitEndpoints {
-		normalEndpoints[endpoint.domainName] = append(normalEndpoints[endpoint.domainName], endpoint)
+		if isWildcardDomain(endpoint.domainName) {
+			wildcardEndpoints[endpoint.domainName] = append(wildcardEndpoints[endpoint.domainName], endpoint)
+		} else {
+			normalEndpoints[endpoint.domainName] = append(normalEndpoints[endpoint.domainName], endpoint)
+
+		}
 	}
 
 	stepsecurity := Endpoint{domainName: "agent.api.stepsecurity.io", port: 443} // Should be implicit based on user feedback
