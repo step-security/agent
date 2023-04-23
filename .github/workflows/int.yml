@@ -19,7 +19,9 @@ jobs:
        allowed-endpoints: 
         api.github.com:443
         github.com:443
+        golang.org:443
         int.api.stepsecurity.io:443
+        objects.githubusercontent.com:443
         pipelines.actions.githubusercontent.com:443
         proxy.golang.org:443
         step-security-agent.s3.us-west-2.amazonaws.com:443
