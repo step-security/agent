@@ -23,8 +23,7 @@ type DNSProxy struct {
 	WildCardEndpoints    map[string][]Endpoint
 	ReverseIPLookup      map[string]string
 	ReverseIPLookupMutex sync.RWMutex
-
-	Iptables *Firewall
+	Iptables             *Firewall
 }
 
 type DNSResponse struct {
@@ -191,27 +190,28 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 			return "", fmt.Errorf("cannot resolve internal domains")
 		}
 
-		matchesAnyWildcard, wildcardPort = proxy.matchAnyWildcard(domain)
+		if !proxy.isAllowedDomain(domain) {
+			matchesAnyWildcard, wildcardPort = proxy.matchAnyWildcard(domain)
+			if !matchesAnyWildcard {
+				go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
 
-		if !proxy.isAllowedDomain(domain) && !matchesAnyWildcard {
-			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
+				// call to api.snapcraft.io is made by snapd in GITHUB_RUNNER
+				// so if it's not present in allowed-domains, traffic to it will get blocked
+				// since it is called by default service, we don't need to add it to annotations
+				// call to docker.io is made by docker. It makes a DNS resolution call, but does not
+				// make a connection to it. This leads to an unnecessary annotation.
+				if !strings.Contains(domain, "api.snapcraft.io") && !strings.Contains(domain, "docker.io") {
+					go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: DNS resolution for domain %s was blocked. This domain is not in the list of allowed-endpoints.", domain))
+				}
 
-			// call to api.snapcraft.io is made by snapd in GITHUB_RUNNER
-			// so if it's not present in allowed-domains, traffic to it will get blocked
-			// since it is called by default service, we don't need to add it to annotations
-			// call to docker.io is made by docker. It makes a DNS resolution call, but does not
-			// make a connection to it. This leads to an unnecessary annotation.
-			if !strings.Contains(domain, "api.snapcraft.io") && !strings.Contains(domain, "docker.io") {
-				go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: DNS resolution for domain %s was blocked. This domain is not in the list of allowed-endpoints.", domain))
+				// return an ip address, so calling process calls the ip address
+				// the call will be blocked by the firewall
+				proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt32, Data: StepSecuritySinkHoleIPAddress})
+
+				go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
+
+				return StepSecuritySinkHoleIPAddress, nil
 			}
-
-			// return an ip address, so calling process calls the ip address
-			// the call will be blocked by the firewall
-			proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt32, Data: StepSecuritySinkHoleIPAddress})
-
-			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
-
-			return StepSecuritySinkHoleIPAddress, nil
 		}
 	}
 
@@ -223,9 +223,8 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	if matchesAnyWildcard {
 		if err := InsertAllowRule(proxy.Iptables, answer.Data, wildcardPort); err != nil {
-			WriteLog(fmt.Sprintf("Error setting firewall for %s:  %v", domain, err))
+			WriteLog(fmt.Sprintf("Error setting firewall for wildcard domain %s:  %v", domain, err))
 		}
-
 	}
 
 	proxy.Cache.Set(domain, answer)
@@ -314,8 +313,6 @@ func startDNSServer(dnsProxy *DNSProxy, server DNSServer, errc chan error) {
 func matchWildcardDomain(pattern, target string) bool {
 	// pattern: *.github.com
 	// target: h0x0er.github.com
-
-	// TODO: Improve the matching logic.
 
 	result := false
 

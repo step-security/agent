@@ -13,9 +13,10 @@ import (
 
 func TestDNSProxy_getResponse(t *testing.T) {
 	type fields struct {
-		Cache            *Cache
-		EgressPolicy     string
-		AllowedEndpoints map[string][]Endpoint
+		Cache             *Cache
+		EgressPolicy      string
+		AllowedEndpoints  map[string][]Endpoint
+		WildCardEndpoints map[string][]Endpoint
 	}
 	type args struct {
 		requestMsg *dns.Msg
@@ -26,10 +27,13 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	rrDnsTest, _ := dns.NewRR("test.com. IN A 67.225.146.248")
 	rrDnsNotAllowed, _ := dns.NewRR(fmt.Sprintf("notallowed.com. IN A %s", StepSecuritySinkHoleIPAddress))
 	rrDnsAllowed, _ := dns.NewRR("allowed.com. IN A 67.225.146.248")
+	rrDnsMcr, _ := dns.NewRR("westus.data.mcr.microsoft.com. IN A 67.225.146.248")
 	allowedEndpoints := make(map[string][]Endpoint)
 	allowedEndpoints["allowed.com."] = append(allowedEndpoints["allowed.com."], Endpoint{domainName: "allowed.com"})
 	allowedEndpointsTest := make(map[string][]Endpoint)
 	allowedEndpointsTest["test.com."] = append(allowedEndpointsTest["test.com."], Endpoint{domainName: "test.com"})
+	wildcardEndpoints := make(map[string][]Endpoint)
+	wildcardEndpoints["*.data.mcr.microsoft.com."] = append(wildcardEndpoints["*.data.mcr.microsoft.com."], Endpoint{domainName: "*.data.mcr.microsoft.com"})
 
 	apiclient := &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl}
 
@@ -37,6 +41,9 @@ func TestDNSProxy_getResponse(t *testing.T) {
 
 	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=test.com.&type=a",
 		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"test.com.","type":1}],"Answer":[{"name":"test.com.","type":1,"TTL":3080,"data":"67.225.146.248"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=westus.data.mcr.microsoft.com.&type=a",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"westus.data.mcr.microsoft.com.","type":1}],"Answer":[{"name":"westus.data.mcr.microsoft.com.","type":1,"TTL":3080,"data":"67.225.146.248"}]}`))
 
 	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=allowed.com.&type=a",
 		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"allowed.com.","type":1}],"Answer":[{"name":"allowed.com.","type":1,"TTL":3080,"data":"67.225.146.248"}]}`))
@@ -87,6 +94,12 @@ func TestDNSProxy_getResponse(t *testing.T) {
 			want:    &dns.Msg{Answer: []dns.RR{rrDnsAllowed}},
 			wantErr: false,
 		},
+		{name: "type A *.data.mcr.microsoft.com egress policy",
+			fields:  fields{Cache: &blockCache, EgressPolicy: EgressPolicyBlock, WildCardEndpoints: wildcardEndpoints},
+			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "westus.data.mcr.microsoft.com.", Qtype: dns.TypeA}}}},
+			want:    &dns.Msg{Answer: []dns.RR{rrDnsMcr}},
+			wantErr: false,
+		},
 		{name: "type A notfound.com",
 			fields:  fields{Cache: &auditCache, EgressPolicy: EgressPolicyAudit},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "notfound.com.", Qtype: dns.TypeA}}}},
@@ -98,11 +111,13 @@ func TestDNSProxy_getResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			proxy := &DNSProxy{
-				Cache:            tt.fields.Cache,
-				ApiClient:        apiclient,
-				EgressPolicy:     tt.fields.EgressPolicy,
-				AllowedEndpoints: tt.fields.AllowedEndpoints,
-				ReverseIPLookup:  make(map[string]string),
+				Cache:             tt.fields.Cache,
+				ApiClient:         apiclient,
+				EgressPolicy:      tt.fields.EgressPolicy,
+				AllowedEndpoints:  tt.fields.AllowedEndpoints,
+				WildCardEndpoints: tt.fields.WildCardEndpoints,
+				ReverseIPLookup:   make(map[string]string),
+				Iptables:          &Firewall{&MockIPTables{}},
 			}
 			got, err := proxy.getResponse(tt.args.requestMsg)
 			if (err != nil) != tt.wantErr {
@@ -172,7 +187,7 @@ func Test_matchWildcardDomain(t *testing.T) {
 		{name: "xyz.abc.github.com", args: args{pattern: "*.github.com", target: "xyz.abc.github.com"}, want: true},
 		{name: "mno.github.com", args: args{pattern: "*.google.com", target: "abc.github.com"}, want: false},
 		{name: "google1.com", args: args{pattern: "*.google1.com", target: "abc.google.com"}, want: false},
-		{name: "productionresultssa*.blob.core.windows.net", args: args{pattern: "productionresultssa*.blob.core.windows.net", target: "productionresultssa.abc.blob.core.windows.net"}, want: true},
+		{name: "productionresultssa*.blob.core.windows.net", args: args{pattern: "productionresultssa*.blob.core.windows.net", target: "productionresultssa123.blob.core.windows.net"}, want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
