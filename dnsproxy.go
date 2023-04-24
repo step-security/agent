@@ -20,8 +20,10 @@ type DNSProxy struct {
 	ApiClient            *ApiClient
 	EgressPolicy         string
 	AllowedEndpoints     map[string][]Endpoint
+	WildCardEndpoints    map[string][]Endpoint
 	ReverseIPLookup      map[string]string
 	ReverseIPLookupMutex sync.RWMutex
+	Iptables             *Firewall
 }
 
 type DNSResponse struct {
@@ -179,6 +181,9 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		return cacheMsg.Value.Data, nil
 	}
 
+	matchesAnyWildcard := false
+	wildcardPort := ""
+
 	if proxy.EgressPolicy == EgressPolicyBlock {
 		if strings.HasSuffix(domain, ".internal.") {
 			go WriteLog(fmt.Sprintf("unable to resolve internal domains: %s", domain))
@@ -186,24 +191,27 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 		}
 
 		if !proxy.isAllowedDomain(domain) {
-			go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
+			matchesAnyWildcard, wildcardPort = proxy.matchAnyWildcard(domain)
+			if !matchesAnyWildcard {
+				go WriteLog(fmt.Sprintf("domain not allowed: %s", domain))
 
-			// call to api.snapcraft.io is made by snapd in GITHUB_RUNNER
-			// so if it's not present in allowed-domains, traffic to it will get blocked
-			// since it is called by default service, we don't need to add it to annotations
-			// call to docker.io is made by docker. It makes a DNS resolution call, but does not
-			// make a connection to it. This leads to an unnecessary annotation.
-			if !strings.Contains(domain, "api.snapcraft.io") && !strings.Contains(domain, "docker.io") {
-				go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: DNS resolution for domain %s was blocked. This domain is not in the list of allowed-endpoints.", domain))
+				// call to api.snapcraft.io is made by snapd in GITHUB_RUNNER
+				// so if it's not present in allowed-domains, traffic to it will get blocked
+				// since it is called by default service, we don't need to add it to annotations
+				// call to docker.io is made by docker. It makes a DNS resolution call, but does not
+				// make a connection to it. This leads to an unnecessary annotation.
+				if !strings.Contains(domain, "api.snapcraft.io") && !strings.Contains(domain, "docker.io") {
+					go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: DNS resolution for domain %s was blocked. This domain is not in the list of allowed-endpoints.", domain))
+				}
+
+				// return an ip address, so calling process calls the ip address
+				// the call will be blocked by the firewall
+				proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt32, Data: StepSecuritySinkHoleIPAddress})
+
+				go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
+
+				return StepSecuritySinkHoleIPAddress, nil
 			}
-
-			// return an ip address, so calling process calls the ip address
-			// the call will be blocked by the firewall
-			proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt32, Data: StepSecuritySinkHoleIPAddress})
-
-			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
-
-			return StepSecuritySinkHoleIPAddress, nil
 		}
 	}
 
@@ -211,6 +219,12 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	if err != nil {
 		go WriteLog(fmt.Sprintf("unable to resolve domain: %s", domain))
 		return "", fmt.Errorf("error in response from dns.google %v", err)
+	}
+
+	if matchesAnyWildcard {
+		if err := InsertAllowRule(proxy.Iptables, answer.Data, wildcardPort); err != nil {
+			WriteLog(fmt.Sprintf("Error setting firewall for wildcard domain %s:  %v", domain, err))
+		}
 	}
 
 	proxy.Cache.Set(domain, answer)
@@ -221,6 +235,15 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	return answer.Data, nil
 
+}
+
+func (proxy *DNSProxy) matchAnyWildcard(domain string) (bool, string) {
+	for wildcard := range proxy.WildCardEndpoints {
+		if matchWildcardDomain(wildcard, domain) {
+			return true, fmt.Sprintf("%v", proxy.WildCardEndpoints[wildcard][0].port)
+		}
+	}
+	return false, ""
 }
 
 func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.RR, error) {
@@ -284,5 +307,22 @@ func startDNSServer(dnsProxy *DNSProxy, server DNSServer, errc chan error) {
 	if err != nil {
 		errc <- errors.Wrap(err, fmt.Sprintf("failed to listen on %v", server))
 	}
+
+}
+
+func matchWildcardDomain(pattern, target string) bool {
+	// pattern: *.github.com
+	// target: h0x0er.github.com
+
+	result := false
+
+	splits := strings.Split(pattern, "*")
+	if splits[0] != "" {
+		result = strings.HasPrefix(target, splits[0]) && strings.HasSuffix(target, splits[1])
+	} else {
+		result = strings.HasSuffix(target, splits[1])
+	}
+
+	return result
 
 }
