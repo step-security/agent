@@ -41,11 +41,11 @@ func Test_updateDockerConfig(t *testing.T) {
 	}{
 		{name: "existing file",
 			args:    args{configPath: tmpFileName},
-			want:    "{\"cgroup-parent\":\"/actions_job\",\"dns\":[\"172.17.0.1\"],\"live-restore\":true,\"userns-remap\":\"runner:runner\"}",
+			want:    "{\"cgroup-parent\":\"/actions_job\",\"dns\":[\"172.17.0.1\"],\"live-restore\":true}",
 			wantErr: false},
 		{name: "non existent file",
 			args:    args{configPath: mockDockerConfigPath},
-			want:    "{\"dns\":[\"172.17.0.1\"],\"live-restore\":true,\"userns-remap\":\"runner:runner\"}",
+			want:    "{\"dns\":[\"172.17.0.1\"],\"live-restore\":true}",
 			wantErr: false},
 	}
 
