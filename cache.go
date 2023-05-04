@@ -6,8 +6,9 @@ import (
 )
 
 type Element struct {
-	Value     *Answer
-	TimeAdded int64
+	Value            *Answer
+	TimeAdded        int64
+	IsWildcardDomain bool
 }
 
 type Cache struct {
@@ -32,7 +33,7 @@ func (cache *Cache) Get(k string) (*Element, bool) {
 		return nil, false
 	}
 
-	if cache.egressPolicy == EgressPolicyAudit {
+	if cache.egressPolicy == EgressPolicyAudit || element.IsWildcardDomain {
 		// TTL is in seconds
 		// if now minus time added is greater than TTL, return nil, so new DNS request is made
 		if time.Now().Unix()-element.TimeAdded > int64(element.Value.TTL) {
@@ -51,12 +52,13 @@ func (cache *Cache) Get(k string) (*Element, bool) {
 	}
 }
 
-func (cache *Cache) Set(k string, v *Answer) {
+func (cache *Cache) Set(k string, v *Answer, isWildcardDomain bool) {
 	cache.mutex.Lock()
 
 	cache.elements[k] = Element{
-		Value:     v,
-		TimeAdded: time.Now().Unix(),
+		Value:            v,
+		TimeAdded:        time.Now().Unix(),
+		IsWildcardDomain: isWildcardDomain,
 	}
 
 	cache.mutex.Unlock()

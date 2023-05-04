@@ -270,7 +270,7 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 							}
 
 							// add to cache with new TTL
-							dnsProxy.Cache.Set(domainName, answer)
+							dnsProxy.Cache.Set(domainName, answer, false)
 
 							WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d", domainName, answer.Data, answer.TTL))
 						}
