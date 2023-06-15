@@ -189,7 +189,11 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 			}
 			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
 			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", event.Timestamp, tool)
-			WriteLog(fmt.Sprintf("endpoint called ip address:port %s:%s, domain: %s", event.IPAddress, event.Port, reverseLookUp))
+			process := ""
+			if image == "" {
+				process = tool.Name
+			}
+			WriteLog(fmt.Sprintf("endpoint called ip address:port %s:%s, domain: %s, pid: %s, process: %s", event.IPAddress, event.Port, reverseLookUp, event.Pid, process))
 			eventHandler.ProcessConnectionMap[cacheKey] = true
 		}
 	}

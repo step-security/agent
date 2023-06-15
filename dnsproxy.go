@@ -217,7 +217,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	answer, err := proxy.ResolveDomain(domain)
 	if err != nil {
-		go WriteLog(fmt.Sprintf("unable to resolve domain: %s", domain))
+		go WriteLog(fmt.Sprintf("unable to resolve domain: %s err: %v", domain, err))
 		return "", fmt.Errorf("error in response from dns.google %v", err)
 	}
 
