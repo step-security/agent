@@ -24,10 +24,12 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	auditCache := InitCache(EgressPolicyAudit)
 	blockCache := InitCache(EgressPolicyBlock)
 	rrDnsGoogle, _ := dns.NewRR("dns.google. IN A 8.8.8.8")
+	rrDnsCloudflare, _ := dns.NewRR("cloudflare-dns.com. IN A 1.1.1.1")
 	rrDnsTest, _ := dns.NewRR("test.com. IN A 67.225.146.248")
 	rrDnsNotAllowed, _ := dns.NewRR(fmt.Sprintf("notallowed.com. IN A %s", StepSecuritySinkHoleIPAddress))
 	rrDnsAllowed, _ := dns.NewRR("allowed.com. IN A 67.225.146.248")
 	rrDnsMcr, _ := dns.NewRR("westus.data.mcr.microsoft.com. IN A 67.225.146.248")
+	rrDnsFallback, _ := dns.NewRR("testfallback.com. IN A 67.225.146.248")
 	allowedEndpoints := make(map[string][]Endpoint)
 	allowedEndpoints["allowed.com."] = append(allowedEndpoints["allowed.com."], Endpoint{domainName: "allowed.com"})
 	allowedEndpointsTest := make(map[string][]Endpoint)
@@ -51,6 +53,9 @@ func TestDNSProxy_getResponse(t *testing.T) {
 	httpmock.RegisterResponder("GET", "https://dns.google/resolve?name=notfound.com.&type=a",
 		httpmock.NewStringResponder(200, `{"Status":3,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"notfound.com.","type":1}],"Authority":[{"name":"com.","type":6,"TTL":900,"data":"a.gtld-servers.net. nstld.verisign-grs.com. 1640040308 1800 900 604800 86400"}],"Comment":"Response from 2001:503:231d::2:30."}`))
 
+	httpmock.RegisterResponder("GET", "https://cloudflare-dns.com/dns-query?name=testfallback.com.&type=A",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"testfallback.com.","type":1}],"Answer":[{"name":"testfallback.com.","type":1,"TTL":3080,"data":"67.225.146.248"}]}`))
+
 	tests := []struct {
 		name    string
 		fields  fields
@@ -58,6 +63,18 @@ func TestDNSProxy_getResponse(t *testing.T) {
 		want    *dns.Msg
 		wantErr bool
 	}{
+		{name: "test fallback",
+			fields:  fields{Cache: &auditCache},
+			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "testfallback.com.", Qtype: dns.TypeA}}}},
+			want:    &dns.Msg{Answer: []dns.RR{rrDnsFallback}},
+			wantErr: false,
+		},
+		{name: "type A cloudflare-dns.com.",
+			fields:  fields{Cache: &auditCache},
+			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "cloudflare-dns.com.", Qtype: dns.TypeA}}}},
+			want:    &dns.Msg{Answer: []dns.RR{rrDnsCloudflare}},
+			wantErr: false,
+		},
 		{name: "type A dns.google",
 			fields:  fields{Cache: &auditCache},
 			args:    args{requestMsg: &dns.Msg{Question: []dns.Question{{Name: "dns.google.", Qtype: dns.TypeA}}}},

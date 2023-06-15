@@ -135,7 +135,25 @@ func TestRun(t *testing.T) {
 			},
 			t.Log))
 
-	httpmock.RegisterResponder("GET", "https://dns.google/resolve", // no query params to match all other requests
+	httpmock.RegisterResponder("GET", "https://cloudflare-dns.com/dns-query?name=actions-results-receiver-production.githubapp.com.&type=A",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://cloudflare-dns.com/dns-query?name=artifactcache.actions.githubusercontent.com.&type=A",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://cloudflare-dns.com/dns-query?name=pipelines.actions.githubusercontent.com.&type=A",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://cloudflare-dns.com/dns-query?name=token.actions.githubusercontent.com.&type=A",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://cloudflare-dns.com/dns-query?name=codeload.github.com.&type=A",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://cloudflare-dns.com/dns-query?name=vstsmms.actions.githubusercontent.com.&type=A",
+		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
+
+	httpmock.RegisterResponder("GET", "https://cloudflare-dns.com/dns-query?name=vstoken.actions.githubusercontent.com.&type=A",
 		httpmock.NewStringResponder(200, `{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"requesteddomain.com.","type":1}],"Answer":[{"name":"requesteddomain.com.","type":1,"TTL":300,"data":"69.69.69.69"}]}`))
 
 	httpmock.RegisterResponder("GET", "https://apiurl/v1/github/owner/repo/actions/subscription",
