@@ -24,6 +24,7 @@ const (
 	accept                    = "ACCEPT"
 	reject                    = "REJECT"
 	dnsServerIP               = "8.8.8.8"
+	dnsServerIP2              = "8.8.4.4"
 	classAPrivateAddressRange = "10.0.0.0/8"
 	classBPrivateAddressRange = "172.16.0.0/12"
 	classCPrivateAddressRange = "192.168.0.0/16"
@@ -90,6 +91,14 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 	// Allow 8.8.8.8 for dns
 	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
 		destination, dnsServerIP, target, accept)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to add rule")
+	}
+
+	// Allow 8.8.4.4 for dns
+	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
+		destination, dnsServerIP2, target, accept)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to add rule")
