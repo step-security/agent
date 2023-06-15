@@ -158,7 +158,7 @@ func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unable to resolve domain %s", domain)
+	return nil, fmt.Errorf("unable to resolve domain %s, status %d", domain, dnsReponse.Status)
 }
 
 func getDomainFromCloudAppFormat(domain string) string {
