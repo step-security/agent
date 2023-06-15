@@ -23,8 +23,6 @@ const (
 	target                    = "-j"
 	accept                    = "ACCEPT"
 	reject                    = "REJECT"
-	dnsServerIP               = "8.8.8.8"
-	dnsServerIP2              = "8.8.4.4"
 	classAPrivateAddressRange = "10.0.0.0/8"
 	classBPrivateAddressRange = "172.16.0.0/12"
 	classCPrivateAddressRange = "192.168.0.0/16"
@@ -58,6 +56,8 @@ func addBlockRulesForGitHubHostedRunner(firewall *Firewall, endpoints []ipAddres
 func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, netInterface, direction string) error {
 	var ipt IPTables
 	var err error
+	dnsServers := []string{"8.8.8.8", "8.8.4.4", "1.1.1.1"}
+
 	if firewall == nil {
 
 		ipt, err = iptables.New()
@@ -88,20 +88,13 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 	}
 
 	// Agent uses HTTPs to resolve domain names
-	// Allow 8.8.8.8 for dns
-	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
-		destination, dnsServerIP, target, accept)
+	for _, dnsServer := range dnsServers {
+		err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
+			destination, dnsServer, target, accept)
 
-	if err != nil {
-		return errors.Wrap(err, "failed to add rule")
-	}
-
-	// Allow 8.8.4.4 for dns
-	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
-		destination, dnsServerIP2, target, accept)
-
-	if err != nil {
-		return errors.Wrap(err, "failed to add rule")
+		if err != nil {
+			return errors.Wrapf(err, "failed to add rule for DNS server %s", dnsServer)
+		}
 	}
 
 	// Allow AzureIPAddress

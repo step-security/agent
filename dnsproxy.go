@@ -116,12 +116,18 @@ func (proxy *DNSProxy) isAllowedDomain(domain string) bool {
 
 func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 	url := fmt.Sprintf("https://dns.google/resolve?name=%s&type=a", domain)
-
+	fallbackUrl := fmt.Sprintf("https://cloudflare-dns.com/dns-query?name=%s&type=A", domain)
 	retryCounter := 0
 	var httpError error
 	var resp *http.Response
 	for retryCounter < 2 {
-		resp, httpError = proxy.ApiClient.Client.Get(url)
+		requestUrl := url
+		if retryCounter == 1 {
+			requestUrl = fallbackUrl
+		}
+		req, _ := http.NewRequest("GET", requestUrl, nil)
+		req.Header.Add("accept", "application/dns-json")
+		resp, httpError = proxy.ApiClient.Client.Do(req)
 		if httpError != nil {
 			retryCounter++
 		} else {
@@ -251,15 +257,19 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 	queryMsg := new(dns.Msg)
 	requestMsg.CopyTo(queryMsg)
 	queryMsg.Question = []dns.Question{*q}
+	domains := map[string]string{
+		"dns.google.":         "8.8.8.8",
+		"cloudflare-dns.com.": "1.1.1.1",
+	}
 
-	if q.Name == "dns.google." {
-		rr, err := dns.NewRR("dns.google. IN A 8.8.8.8")
+	if ip, ok := domains[q.Name]; ok {
+		rr, err := dns.NewRR(fmt.Sprintf("%s IN A %s", q.Name, ip))
 
 		if err != nil {
 			return nil, err
 		}
 
-		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt32, Data: "8.8.8.8"}, false)
+		proxy.Cache.Set(q.Name, &Answer{Name: q.Name, TTL: math.MaxInt32, Data: ip}, false)
 
 		return &rr, nil
 	}
