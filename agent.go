@@ -289,10 +289,10 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 
 	implicitEndpoints := []Endpoint{
 
-		{domainName: "*.actions.githubusercontent.com", port: 443},                   // GitHub
+		{domainName: "*.actions.githubusercontent.com.", port: 443},                  // GitHub
 		{domainName: "codeload.github.com", port: 443},                               // GitHub
 		{domainName: "actions-results-receiver-production.githubapp.com", port: 443}, // GitHub
-		{domainName: "productionresultssa*.blob.core.windows.net", port: 443},        // GitHub
+		{domainName: "productionresultssa*.blob.core.windows.net.", port: 443},       // GitHub
 	}
 
 	for key, val := range endpoints {
