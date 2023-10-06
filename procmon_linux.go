@@ -55,8 +55,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		if len(workingDirectory) == 0 {
 			workingDirectory = "/home/runner"
 		}
-		//r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag))
-		r, _ := flags.Parse(fmt.Sprintf("-w %s -p w -k %s", workingDirectory, fileMonitorTag))
+		r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag))
 
 		actualBytes, _ := rule.Build(r)
 
