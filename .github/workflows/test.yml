@@ -13,6 +13,11 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit
+
     - name: Checkout
       uses: actions/checkout@629c2de402a417ea7690ca6ce3f33229e27606a5
     - name: Set up Go 
