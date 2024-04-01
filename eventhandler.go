@@ -98,7 +98,7 @@ func isSourceCodeFile(fileName string) bool {
 		return true
 	}
 
-	return false
+	return true
 }
 
 func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
