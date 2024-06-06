@@ -16,6 +16,7 @@ type config struct {
 	RunId                 string
 	WorkingDirectory      string
 	APIURL                string
+	OneTimeKey            string
 	Endpoints             map[string][]Endpoint
 	EgressPolicy          string
 	DisableTelemetry      bool
@@ -35,6 +36,7 @@ type configFile struct {
 	RunId                 string `json:"run_id"`
 	WorkingDirectory      string `json:"working_directory"`
 	APIURL                string `json:"api_url"`
+	OneTimeKey            string `json:"one_time_key"`
 	AllowedEndpoints      string `json:"allowed_endpoints"`
 	EgressPolicy          string `json:"egress_policy"`
 	DisableTelemetry      bool   `json:"disable_telemetry"`
@@ -67,6 +69,7 @@ func (c *config) init(configFilePath string) error {
 	c.DisableSudo = configFile.DisableSudo
 	c.DisableFileMonitoring = configFile.DisableFileMonitoring
 	c.Private = configFile.Private
+	c.OneTimeKey = configFile.OneTimeKey
 	return nil
 }
 
