@@ -40,6 +40,7 @@ type ApiClient struct {
 	APIURL           string
 	DisableTelemetry bool
 	EgressPolicy     string
+	OneTimeKey       string
 }
 
 const agentApiBaseUrl = "https://apiurl/v1"
@@ -113,6 +114,7 @@ func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{})
 		return err
 	}
 
+	req.Header.Add("x-one-time-key", apiclient.OneTimeKey)
 	if body != nil {
 		req.Header.Add("Content-Type", "application/json; charset=UTF-8")
 	}
