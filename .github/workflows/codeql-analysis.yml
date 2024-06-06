@@ -37,7 +37,7 @@ jobs:
         # Learn more about CodeQL language support at https://git.io/codeql-language-support
 
     steps:
-    - uses: step-security/harden-runner@v1
+    - uses: step-security/harden-runner@f086349bfa2bd1361f7909c78558e816508cdc10 # v2.8.0
       with:
         egress-policy: audit
     - name: Checkout repository
