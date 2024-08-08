@@ -202,6 +202,8 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 }
 
 func (eventHandler *EventHandler) HandleEvent(event *Event) {
+	defer panicHandler()
+
 	switch event.EventType {
 	case netMonitorTag:
 		eventHandler.handleNetworkEvent(event)

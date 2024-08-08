@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 
 	"github.com/miekg/dns"
@@ -39,6 +40,14 @@ func main() {
 	if err := Run(ctx, agentConfigFilePath, &dns.Server{Addr: "127.0.0.1:53", Net: "udp"},
 		&dns.Server{Addr: "172.17.0.1:53", Net: "udp"}, nil, nil, nil, resolvedConfigPath, dockerDaemonConfigPath, os.TempDir()); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
+	}
+}
+
+func panicHandler() {
+	if r := recover(); r != nil {
+		RevertChanges(nil, nil, nil, resolvedConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
+		WriteLog(fmt.Sprintf("[agent] panic: %v; \n %s", r, debug.Stack()))
 		os.Exit(1)
 	}
 }
