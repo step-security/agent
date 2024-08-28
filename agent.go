@@ -125,10 +125,22 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			// this will cause domain, IP mapping to be cached
 			ipAddress, err := dnsProxy.getIPByDomain(domainName)
 			if err != nil {
-				WriteLog(fmt.Sprintf("Error resolving allowed domain %v", err))
-				WriteAnnotation(fmt.Sprintf("%s Reverting agent since allowed endpoint %s could not be resolved", StepSecurityAnnotationPrefix, strings.Trim(domainName, ".")))
-				RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
-				return err
+				WriteLog(fmt.Sprintf("Error resolving allowed domain in Block mode %v", err))
+				WriteLog("Switching to Audit mode.")
+
+				// Change the policy to Audit
+				config.EgressPolicy = EgressPolicyAudit
+				apiclient.EgressPolicy = EgressPolicyAudit
+
+				// Reinitialize the Cache with the new Audit policy
+				Cache = InitCache(config.EgressPolicy)
+
+				// Update DNSProxy with the new cache and EgressPolicy
+				dnsProxy.Cache = &Cache
+				dnsProxy.EgressPolicy = EgressPolicyAudit
+
+				// Exit the loop as we have switched to Audit policy
+				break
 			}
 			for _, endpoint := range endpoints {
 				// create list of ip address to be added to firewall
