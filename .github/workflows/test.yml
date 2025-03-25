@@ -13,6 +13,11 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+      with:
+        egress-policy: audit
+
     - name: Checkout
       uses: actions/checkout@629c2de402a417ea7690ca6ce3f33229e27606a5
     - name: Set up Go 
