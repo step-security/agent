@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/florianl/go-nflog/v2"
+	"github.com/step-security/agent/lockfile"
+	"github.com/step-security/armour/armour"
 )
 
 const (
@@ -74,6 +76,16 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 	WriteLog("\n")
+
+	InitGlobalFeatureFlags(config.APIURL, apiclient)
+	if IsArmourEnabled() {
+		lf := lockfile.New(agentLockFile)
+		if err := lf.TryLock(); err != nil {
+			WriteLog("[agent] instance is already running")
+			os.Exit(0)
+		}
+		defer lf.MustUnlock()
+	}
 
 	// if this is a private repo
 	if config.Private {
@@ -202,6 +214,35 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		}
 
 		go refreshDNSEntries(ctx, iptables, allowedEndpoints, &dnsProxy)
+	}
+
+	if IsArmourEnabled() {
+		WriteLog("Armour is enabled")
+		conf := &armour.Config{
+			Pids:             getPidsOfInterest(),
+			Files:            []string{},
+			EnforceReadBlock: false,
+			ApiConf: &armour.ApiConf{
+				APIURL:           config.APIURL,
+				Repo:             config.Repo,
+				CorrelationID:    config.CorrelationId,
+				OneTimeKey:       config.OneTimeKey,
+				DisableTelemetry: config.DisableTelemetry,
+			},
+		}
+
+		conf.Files = append(conf.Files, getProcFilesOfInterest()...)
+
+		conf.Files = append(conf.Files, getFilesOfInterest()...)
+
+		mArmour := armour.NewArmour(ctx, conf)
+		err := mArmour.Attach()
+		if err != nil {
+			WriteLog("Armour attachment failed")
+		} else {
+			defer mArmour.Detach()
+			WriteLog("Armour attached")
+		}
 	}
 
 	if config.DisableSudo {

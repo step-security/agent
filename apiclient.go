@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -102,6 +103,36 @@ func (apiclient *ApiClient) getSubscriptionStatus(repo string) bool {
 	}
 
 	return true
+}
+
+func (apiclient *ApiClient) getGlobalFeatureFlags() GlobalFeatureFlags {
+
+	url := fmt.Sprintf("%s/global-feature-flags?agent_type=%s", apiclient.APIURL, AgentTypeGitHubHosted)
+
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		return GlobalFeatureFlags{}
+	}
+
+	resp, err := apiclient.Client.Do(req)
+
+	if err != nil {
+		return GlobalFeatureFlags{}
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return GlobalFeatureFlags{}
+	}
+
+	var globalFeatureFlags GlobalFeatureFlags
+	err = json.Unmarshal(body, &globalFeatureFlags)
+	if err != nil {
+		return GlobalFeatureFlags{}
+	}
+
+	return globalFeatureFlags
 }
 
 func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{}) error {
