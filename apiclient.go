@@ -109,7 +109,7 @@ func (apiclient *ApiClient) getGlobalFeatureFlags() GlobalFeatureFlags {
 
 	url := fmt.Sprintf("%s/global-feature-flags?agent_type=%s", apiclient.APIURL, AgentTypeGitHubHosted)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 
 	if err != nil {
 		return GlobalFeatureFlags{}

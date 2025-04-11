@@ -99,19 +99,19 @@ func (d *DnsConfig) SetDNSServer(cmd Command, resolvdConfigPath, tempDir string)
 
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error stopping systemd-resolved: %v", err))
+		return fmt.Errorf("error stopping systemd-resolved: %v", err)
 	}
 
 	d.ResolveConfigBackUpPath = path.Join(tempDir, "resolved.conf")
 	err = copy(resolvdConfigPath, d.ResolveConfigBackUpPath)
 
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error backing up resolve config: %v", err))
+		return fmt.Errorf("error backing up resolve config: %v", err)
 	}
 
 	err = writeResolveConfig(resolvdConfigPath)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error writing to resolve config: %v", err))
+		return fmt.Errorf("error writing to resolve config: %v", err)
 	}
 
 	if !mock {
@@ -120,7 +120,7 @@ func (d *DnsConfig) SetDNSServer(cmd Command, resolvdConfigPath, tempDir string)
 
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error restarting systemd-resolved: %v", err))
+		return fmt.Errorf("error restarting systemd-resolved: %v", err)
 	}
 
 	// flush DNS cache
@@ -164,7 +164,7 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 		d.DockerConfigBackUpPath = path.Join(tempDir, "daemon.json")
 		err := copy(configPath, d.DockerConfigBackUpPath)
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("error backing up docker config: %v", err))
+			return fmt.Errorf("error backing up docker config: %v", err)
 		}
 	} else {
 		d.ShouldDeleteDockerConfig = true
@@ -173,7 +173,7 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 	mock := cmd != nil
 	err := updateDockerConfig(configPath)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error updating to docker daemon config: %v", err))
+		return fmt.Errorf("error updating to docker daemon config: %v", err)
 	}
 
 	// reload will apply the live-restore config so running containers restart after docker is restarted
@@ -183,7 +183,7 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error reloading docker: %v", err))
+		return fmt.Errorf("error reloading docker: %v", err)
 	}
 
 	if !mock {
@@ -192,7 +192,7 @@ func (d *DnsConfig) SetDockerDNSServer(cmd Command, configPath, tempDir string) 
 
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error restarting docker: %v", err))
+		return fmt.Errorf("error restarting docker: %v", err)
 	}
 
 	return nil
@@ -203,12 +203,12 @@ func (d *DnsConfig) RevertDockerDNSServer(cmd Command, configPath string) error 
 		if len(d.DockerConfigBackUpPath) > 0 {
 			err := copy(d.DockerConfigBackUpPath, configPath)
 			if err != nil {
-				return fmt.Errorf(fmt.Sprintf("error recovering docker config: %v", err))
+				return fmt.Errorf("error recovering docker config: %v", err)
 			}
 		} else if d.ShouldDeleteDockerConfig {
 			err := os.Remove(configPath)
 			if err != nil {
-				return fmt.Errorf(fmt.Sprintf("error deleting docker config: %v", err))
+				return fmt.Errorf("error deleting docker config: %v", err)
 			}
 		}
 
@@ -218,7 +218,7 @@ func (d *DnsConfig) RevertDockerDNSServer(cmd Command, configPath string) error 
 
 		err := cmd.Run()
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("error restarting docker: %v", err))
+			return fmt.Errorf("error restarting docker: %v", err)
 		}
 	}
 	return nil
@@ -233,13 +233,13 @@ func (d *DnsConfig) RevertDNSServer(cmd Command, resolvdConfigPath string) error
 
 		err := cmd.Run()
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("error stopping systemd-resolved: %v", err))
+			return fmt.Errorf("error stopping systemd-resolved: %v", err)
 		}
 
 		err = copy(d.ResolveConfigBackUpPath, resolvdConfigPath)
 
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("error recovering resolve config: %v", err))
+			return fmt.Errorf("error recovering resolve config: %v", err)
 		}
 
 		if !mock {
@@ -248,7 +248,7 @@ func (d *DnsConfig) RevertDNSServer(cmd Command, resolvdConfigPath string) error
 
 		err = cmd.Run()
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("error restarting systemd-resolved: %v", err))
+			return fmt.Errorf("error restarting systemd-resolved: %v", err)
 		}
 	}
 

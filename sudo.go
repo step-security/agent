@@ -19,11 +19,11 @@ func (s *Sudo) disableSudo(tempDir string) error {
 	err := copy(sudoersFile, s.SudoersBackUpPath)
 
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("error backing up sudoers file: %v", err))
+		return fmt.Errorf("error backing up sudoers file: %v", err)
 	}
 	err = os.Remove(sudoersFile)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("unable to delete sudoers file at %s: %v", sudoersFile, err))
+		return fmt.Errorf("unable to delete sudoers file at %s: %v", sudoersFile, err)
 	}
 
 	return nil
@@ -34,7 +34,7 @@ func (s *Sudo) revertDisableSudo() error {
 		err := copy(s.SudoersBackUpPath, sudoersFile)
 
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("error reverting sudoers file: %v", err))
+			return fmt.Errorf("error reverting sudoers file: %v", err)
 		}
 	}
 
