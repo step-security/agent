@@ -78,6 +78,8 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	WriteLog("\n")
 
 	InitGlobalFeatureFlags(config.APIURL, apiclient)
+	WriteLog("initialized global feature flags")
+	WriteLog("\n")
 	if IsArmourEnabled() {
 		lf := lockfile.New(agentLockFile)
 		if err := lf.TryLock(); err != nil {
