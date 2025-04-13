@@ -7,6 +7,9 @@ on:
 
 permissions: read-all    
 
+env:
+  GOPRIVATE: github.com/step-security
+
 jobs:
   test:
     permissions:
@@ -18,7 +21,19 @@ jobs:
     - name: Set up Go 
       uses: actions/setup-go@424fc82d43fa5a37540bae62709ddcc23d9520d4
       with:
-        go-version: 1.19
+        go-version: 1.24.1
+
+    - name: Configure .netrc
+      run: |
+        if [[ ! -e "~/.netrc" ]]; then
+            touch ~/.netrc
+        fi
+        printf "machine github.com login stepsecurity-infra-bot password ${{ secrets.PAT }}" >>~/.netrc
+    
+    - name: Create go vendor dir
+      run: |
+        go mod vendor
+
     - name: Run coverage
       run: sudo CI=true go test -race -coverprofile=coverage.txt -covermode=atomic      
     - uses: codecov/codecov-action@40a12dcee2df644d47232dde008099a3e9e4f865
