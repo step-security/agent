@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path"
+	"strings"
 )
 
 type Sudo struct {
@@ -14,6 +15,7 @@ type Sudo struct {
 
 const (
 	sudoersFile = "/etc/sudoers.d/runner"
+	runnerUser  = "runner"
 )
 
 func (s *Sudo) disableSudo(tempDir string) error {
@@ -47,17 +49,24 @@ func (s *Sudo) disableSudoAndContainers(tempDir string) error {
 
 	// Remove socket permissions if they exist
 	s.removeSocketPermissions()
+	var errstrings []string
 
 	// Remove user from docker group
 	if err := s.removeUserFromDockerGroup(); err != nil {
-		return err
+		WriteLog(fmt.Sprintf("error removing user from docker group: %v", err))
+		errstrings = append(errstrings, err.Error())
 	}
 
 	err := s.disableSudo(tempDir)
 	if err != nil {
-		return err
+		WriteLog(fmt.Sprintf("error disabling sudo: %v", err))
+		errstrings = append(errstrings, err.Error())
 	}
 
+	//flatten errs
+	if len(errstrings) > 0 {
+		return fmt.Errorf("error disabling sudo and containers: %s", strings.Join(errstrings, "\n"))
+	}
 	return nil
 }
 
@@ -66,30 +75,34 @@ func (s *Sudo) removeSocketPermissions() {
 	// Check and remove docker.sock permissions if it exists
 	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
 		cmd := exec.Command("sudo", "chmod", "000", "/var/run/docker.sock")
-		cmd.Run()
+		err := cmd.Run()
+		if err != nil {
+			WriteLog(fmt.Sprintf("error removing docker.sock permissions: %v", err))
+		}
 	}
 
 	// Check and remove containerd.sock permissions if it exists
 	if _, err := os.Stat("/run/containerd/containerd.sock"); err == nil {
 		cmd := exec.Command("sudo", "chmod", "000", "/run/containerd/containerd.sock")
-		cmd.Run()
+		err := cmd.Run()
+		if err != nil {
+			WriteLog(fmt.Sprintf("error removing containerd.sock permissions: %v", err))
+		}
 	}
 }
 
 // removeUserFromDockerGroup removes the current user from the docker group
 func (s *Sudo) removeUserFromDockerGroup() error {
-	currentUser, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("error getting current user: %v", err)
-	}
 
-	cmd := exec.Command("sudo", "gpasswd", "-d", currentUser.Username, "docker")
+	cmd := exec.Command("sudo", "gpasswd", "-d", runnerUser, "docker")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// It's okay if the user is not in the docker group
+		WriteLog(fmt.Sprintf("error removing user from docker group: %v", err))
 		if len(output) > 0 {
 			// Check if the error is because the user is not a member
-			if fmt.Sprintf("%s", output) != fmt.Sprintf("gpasswd: user '%s' is not a member of 'docker'\n", currentUser.Username) {
+			WriteLog(fmt.Sprintf("error removing user from docker group: output: %s", output))
+			if fmt.Sprintf("%s", output) != fmt.Sprintf("gpasswd: user '%s' is not a member of 'docker'\n", runnerUser) {
 				return fmt.Errorf("error removing user from docker group: %v, output: %s", err, output)
 			}
 		}
