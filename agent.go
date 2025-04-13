@@ -95,6 +95,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		if !isActive {
 			config.EgressPolicy = EgressPolicyAudit
 			config.DisableSudo = false
+			config.DisableSudoAndContainers = false
 			apiclient.DisableTelemetry = true
 			config.DisableFileMonitoring = true
 			WriteAnnotation("StepSecurity Harden Runner is disabled. A subscription is required for private repositories. Please start a free trial at https://www.stepsecurity.io")
@@ -247,6 +248,15 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		}
 	}
 
+	if config.DisableSudoAndContainers {
+		err := sudo.disableSudoAndContainers(tempDir)
+		if err != nil {
+			WriteAnnotation(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
+		} else {
+			WriteLog("disabled sudo and docker")
+		}
+	}
+
 	if config.DisableSudo {
 		err := sudo.disableSudo(tempDir)
 		if err != nil {
@@ -382,6 +392,10 @@ func RevertChanges(iptables *Firewall, nflog AgentNflogger,
 	err = sudo.revertDisableSudo()
 	if err != nil {
 		WriteLog(fmt.Sprintf("Error in reverting sudo changes %v", err))
+	}
+	err = sudo.revertDisableSudoAndContainers()
+	if err != nil {
+		WriteLog(fmt.Sprintf("Error in reverting sudo and containers changes %v", err))
 	}
 	WriteLog("Reverted changes")
 }
