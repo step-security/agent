@@ -95,6 +95,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		if !isActive {
 			config.EgressPolicy = EgressPolicyAudit
 			config.DisableSudo = false
+			config.DisableSudoAndContainers = false
 			apiclient.DisableTelemetry = true
 			config.DisableFileMonitoring = true
 			WriteAnnotation("StepSecurity Harden Runner is disabled. A subscription is required for private repositories. Please start a free trial at https://www.stepsecurity.io")
@@ -132,6 +133,10 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	dnsConfig := DnsConfig{}
 	sudo := Sudo{}
 	var ipAddressEndpoints []ipAddressEndpoint
+
+	if config.DisableSudoAndContainers {
+		go sudo.uninstallDocker()
+	}
 
 	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
@@ -244,6 +249,15 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		} else {
 			defer mArmour.Detach()
 			WriteLog("Armour attached")
+		}
+	}
+
+	if config.DisableSudoAndContainers {
+		err := sudo.disableSudoAndContainers(tempDir)
+		if err != nil {
+			WriteLog(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
+		} else {
+			WriteLog("disabled sudo and docker")
 		}
 	}
 
