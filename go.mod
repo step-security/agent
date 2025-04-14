@@ -41,6 +41,6 @@ require (
 	github.com/docker/docker v23.0.4+incompatible
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
-	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/net v0.39.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
 )
