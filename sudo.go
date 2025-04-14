@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -47,15 +48,11 @@ func (s *Sudo) revertDisableSudo() error {
 
 func (s *Sudo) disableSudoAndContainers(tempDir string) error {
 
+	s.removeDockerDirectoriesAndFiles()
+
 	// Remove socket permissions if they exist
 	s.removeSocketPermissions()
 	var errstrings []string
-
-	// Remove user from docker group
-	if err := s.removeUserFromDockerGroup(); err != nil {
-		WriteLog(fmt.Sprintf("error removing user from docker group: %v", err))
-		errstrings = append(errstrings, err.Error())
-	}
 
 	err := s.disableSudo(tempDir)
 	if err != nil {
@@ -89,25 +86,6 @@ func (s *Sudo) removeSocketPermissions() {
 			WriteLog(fmt.Sprintf("error removing containerd.sock permissions: %v", err))
 		}
 	}
-}
-
-// removeUserFromDockerGroup removes the current user from the docker group
-func (s *Sudo) removeUserFromDockerGroup() error {
-
-	cmd := exec.Command("sudo", "gpasswd", "-d", runnerUser, "docker")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// It's okay if the user is not in the docker group
-		WriteLog(fmt.Sprintf("error removing user from docker group: %v", err))
-		if len(output) > 0 {
-			// Check if the error is because the user is not a member
-			WriteLog(fmt.Sprintf("error removing user from docker group: output: %s", output))
-			if fmt.Sprintf("%s", output) != fmt.Sprintf("gpasswd: user '%s' is not a member of 'docker'\n", runnerUser) {
-				return fmt.Errorf("error removing user from docker group: %v, output: %s", err, output)
-			}
-		}
-	}
-	return nil
 }
 
 // revertDisableSudoAndContainers reverts the changes made by disableSudoAndContainers
@@ -153,5 +131,50 @@ func (s *Sudo) addUserToDockerGroup() error {
 	if err != nil {
 		return fmt.Errorf("error adding user back to docker group: %v, output: %s", err, output)
 	}
+	return nil
+}
+
+func run(cmd string, args ...string) {
+	WriteLog(fmt.Sprintf("Running: %s %v", cmd, args))
+	c := exec.Command(cmd, args...)
+
+	stdout, _ := c.StdoutPipe()
+	stderr, _ := c.StderrPipe()
+
+	if err := c.Start(); err != nil {
+		WriteLog(fmt.Sprintf("Failed to start command: %s", err))
+	}
+
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			WriteLog(scanner.Text())
+		}
+	}()
+
+	// Stream stderr
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			WriteLog(scanner.Text())
+		}
+	}()
+
+	if err := c.Wait(); err != nil {
+		WriteLog(fmt.Sprintf("Command failed: %v", err))
+	}
+}
+
+func (s *Sudo) uninstallDocker() error {
+	run("sudo", "apt-get", "purge", "-y",
+		"docker-ce", "docker-ce-cli", "containerd.io")
+	return nil
+}
+
+func (s *Sudo) removeDockerDirectoriesAndFiles() error {
+	run("sudo", "rm", "-rf", "/var/lib/docker")
+	run("sudo", "rm", "-rf", "/var/lib/containerd")
+	run("sudo", "rm", "-f", "/etc/apt/sources.list.d/docker.list")
+	run("sudo", "rm", "-f", "/etc/apt/keyrings/docker.asc")
 	return nil
 }
