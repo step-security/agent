@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
 	"path"
 	"strings"
 )
@@ -86,52 +85,6 @@ func (s *Sudo) removeSocketPermissions() {
 			WriteLog(fmt.Sprintf("error removing containerd.sock permissions: %v", err))
 		}
 	}
-}
-
-// revertDisableSudoAndContainers reverts the changes made by disableSudoAndContainers
-func (s *Sudo) revertDisableSudoAndContainers() error {
-	// Step 1: Restore the sudoers file from backup
-	s.revertDisableSudo()
-
-	// Step 2: Restore socket permissions
-	s.restoreSocketPermissions()
-
-	// Step 3: Add user back to docker group
-	if err := s.addUserToDockerGroup(); err != nil {
-		return fmt.Errorf("error adding user back to docker group: %v", err)
-	}
-
-	return nil
-}
-
-// restoreSocketPermissions restores permissions to Docker and containerd sockets
-func (s *Sudo) restoreSocketPermissions() {
-	// Check if docker socket exists before restoring
-	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
-		cmd := exec.Command("sudo", "chmod", "660", "/var/run/docker.sock")
-		cmd.Run()
-	}
-
-	// Check if containerd socket exists before restoring
-	if _, err := os.Stat("/run/containerd/containerd.sock"); err == nil {
-		cmd := exec.Command("sudo", "chmod", "660", "/run/containerd/containerd.sock")
-		cmd.Run()
-	}
-}
-
-// addUserToDockerGroup adds the current user back to the docker group
-func (s *Sudo) addUserToDockerGroup() error {
-	currentUser, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("error getting current user: %v", err)
-	}
-
-	cmd := exec.Command("sudo", "gpasswd", "-a", currentUser.Username, "docker")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error adding user back to docker group: %v, output: %s", err, output)
-	}
-	return nil
 }
 
 func run(cmd string, args ...string) {

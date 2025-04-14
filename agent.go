@@ -397,10 +397,6 @@ func RevertChanges(iptables *Firewall, nflog AgentNflogger,
 	if err != nil {
 		WriteLog(fmt.Sprintf("Error in reverting sudo changes %v", err))
 	}
-	err = sudo.revertDisableSudoAndContainers()
-	if err != nil {
-		WriteLog(fmt.Sprintf("Error in reverting sudo and containers changes %v", err))
-	}
 	WriteLog("Reverted changes")
 }
 
