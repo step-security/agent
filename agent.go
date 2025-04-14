@@ -134,6 +134,10 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	sudo := Sudo{}
 	var ipAddressEndpoints []ipAddressEndpoint
 
+	if config.DisableSudoAndContainers {
+		go sudo.uninstallDocker()
+	}
+
 	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
 		for domainName, endpoints := range allowedEndpoints {
