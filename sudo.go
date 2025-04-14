@@ -119,6 +119,7 @@ func run(cmd string, args ...string) {
 }
 
 func (s *Sudo) uninstallDocker() error {
+	WriteLog("Uninstalling docker")
 	run("sudo", "apt-get", "purge", "-y",
 		"docker-ce", "docker-ce-cli", "containerd.io")
 	return nil
