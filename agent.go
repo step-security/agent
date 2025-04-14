@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/florianl/go-nflog/v2"
+	"github.com/step-security/agent/lockfile"
+	"github.com/step-security/armour/armour"
 )
 
 const (
@@ -75,12 +77,25 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 	WriteLog("\n")
 
+	InitGlobalFeatureFlags(config.APIURL, apiclient)
+	WriteLog("initialized global feature flags")
+	WriteLog("\n")
+	if IsArmourEnabled() {
+		lf := lockfile.New(agentLockFile)
+		if err := lf.TryLock(); err != nil {
+			WriteLog("[agent] instance is already running")
+			os.Exit(0)
+		}
+		defer lf.MustUnlock()
+	}
+
 	// if this is a private repo
 	if config.Private {
 		isActive := apiclient.getSubscriptionStatus(config.Repo)
 		if !isActive {
 			config.EgressPolicy = EgressPolicyAudit
 			config.DisableSudo = false
+			config.DisableSudoAndContainers = false
 			apiclient.DisableTelemetry = true
 			config.DisableFileMonitoring = true
 			WriteAnnotation("StepSecurity Harden Runner is disabled. A subscription is required for private repositories. Please start a free trial at https://www.stepsecurity.io")
@@ -118,6 +133,10 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	dnsConfig := DnsConfig{}
 	sudo := Sudo{}
 	var ipAddressEndpoints []ipAddressEndpoint
+
+	if config.DisableSudoAndContainers {
+		go sudo.uninstallDocker()
+	}
 
 	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
@@ -202,6 +221,44 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		}
 
 		go refreshDNSEntries(ctx, iptables, allowedEndpoints, &dnsProxy)
+	}
+
+	if IsArmourEnabled() {
+		WriteLog("Armour is enabled")
+		conf := &armour.Config{
+			Pids:             getPidsOfInterest(),
+			Files:            []string{},
+			EnforceReadBlock: false,
+			ApiConf: &armour.ApiConf{
+				APIURL:           config.APIURL,
+				Repo:             config.Repo,
+				CorrelationID:    config.CorrelationId,
+				OneTimeKey:       config.OneTimeKey,
+				DisableTelemetry: config.DisableTelemetry,
+			},
+		}
+
+		conf.Files = append(conf.Files, getProcFilesOfInterest()...)
+
+		conf.Files = append(conf.Files, getFilesOfInterest()...)
+
+		mArmour := armour.NewArmour(ctx, conf)
+		err := mArmour.Attach()
+		if err != nil {
+			WriteLog("Armour attachment failed")
+		} else {
+			defer mArmour.Detach()
+			WriteLog("Armour attached")
+		}
+	}
+
+	if config.DisableSudoAndContainers {
+		err := sudo.disableSudoAndContainers(tempDir)
+		if err != nil {
+			WriteLog(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
+		} else {
+			WriteLog("disabled sudo and docker")
+		}
 	}
 
 	if config.DisableSudo {

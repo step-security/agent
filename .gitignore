@@ -17,3 +17,6 @@ pkg/.DS_Store
 coverage.txt
 
 .vscode/
+
+vendor
+private-src

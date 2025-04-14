@@ -6,12 +6,13 @@ on:
       - '*'
 
 permissions: read-all
-
+env:
+  GOPRIVATE: github.com/step-security
 jobs:
   release:
     permissions:
       contents: write
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - uses: step-security/harden-runner@f086349bfa2bd1361f7909c78558e816508cdc10 # v2.8.0
       with:
@@ -28,7 +29,21 @@ jobs:
     - name: Set up Go 
       uses: actions/setup-go@424fc82d43fa5a37540bae62709ddcc23d9520d4
       with:
-        go-version: 1.19    
+        go-version: 1.24.1
+    
+    - name: Configure .netrc
+      run: |
+        if [[ ! -e "~/.netrc" ]]; then
+            touch ~/.netrc
+        fi
+        printf "machine github.com login stepsecurity-infra-bot password ${{ secrets.PAT }}" >>~/.netrc
+
+      
+    - name: Create go vendor dir
+      run: |
+        go mod vendor
+             
+    
     - uses: goreleaser/goreleaser-action@5df302e5e9e4c66310a6b6493a8865b12c555af2
       with:
         distribution: goreleaser

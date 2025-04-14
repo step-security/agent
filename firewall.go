@@ -73,7 +73,7 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 		err = ipt.ClearChain(filterTable, dockerUserChain)
 
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("ClearChain failed for DOCKER-USER: %v", err))
+			return fmt.Errorf("ClearChain failed for DOCKER-USER: %v", err)
 		}
 	}
 
@@ -156,7 +156,7 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, allProtocols, target, reject)
 
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Append failed: %v", err))
+		return fmt.Errorf("Append failed: %v", err)
 	}
 
 	return nil
@@ -242,25 +242,25 @@ func AddAuditRules(firewall *Firewall) error {
 	err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "tcp", "--tcp-flags", "SYN,ACK", "SYN", "-j", "NFLOG", "--nflog-group", "100")
 
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Append failed for eth0: %v", err))
+		return fmt.Errorf("Append failed for eth0: %v", err)
 	}
 
 	err = ipt.ClearChain("filter", "DOCKER-USER")
 
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("ClearChain failed for DOCKER-USER: %v", err))
+		return fmt.Errorf("ClearChain failed for DOCKER-USER: %v", err)
 	}
 
 	err = ipt.Append("filter", "DOCKER-USER", "-i", "docker0", "-p", "udp", "--dport", "53", "-j", "DROP")
 
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("failed to deny udp docker interface: %v", err))
+		return fmt.Errorf("failed to deny udp docker interface: %v", err)
 	}
 
 	err = ipt.Append("filter", "DOCKER-USER", "-i", "docker0", "-p", "tcp", "--tcp-flags", "SYN,ACK", "SYN", "-j", "NFLOG", "--nflog-group", "100")
 
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Append failed for FORWARD: %v", err))
+		return fmt.Errorf("Append failed for FORWARD: %v", err)
 	}
 
 	return nil
