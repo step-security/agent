@@ -255,7 +255,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	if config.DisableSudoAndContainers {
 		err := sudo.disableSudoAndContainers(tempDir)
 		if err != nil {
-			WriteAnnotation(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
+			WriteLog(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
 		} else {
 			WriteLog("disabled sudo and docker")
 		}
@@ -396,10 +396,6 @@ func RevertChanges(iptables *Firewall, nflog AgentNflogger,
 	err = sudo.revertDisableSudo()
 	if err != nil {
 		WriteLog(fmt.Sprintf("Error in reverting sudo changes %v", err))
-	}
-	err = sudo.revertDisableSudoAndContainers()
-	if err != nil {
-		WriteLog(fmt.Sprintf("Error in reverting sudo and containers changes %v", err))
 	}
 	WriteLog("Reverted changes")
 }
