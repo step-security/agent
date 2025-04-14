@@ -255,7 +255,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	if config.DisableSudoAndContainers {
 		err := sudo.disableSudoAndContainers(tempDir)
 		if err != nil {
-			WriteAnnotation(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
+			WriteLog(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
 		} else {
 			WriteLog("disabled sudo and docker")
 		}
