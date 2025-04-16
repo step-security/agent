@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -30,7 +29,7 @@ const (
 
 func updateDockerConfig(configPath string) error {
 
-	data, err := ioutil.ReadFile(configPath)
+	data, err := os.ReadFile(configPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return errors.Wrap(err, "failed to read config file")
 	}

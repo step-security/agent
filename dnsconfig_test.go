@@ -54,7 +54,7 @@ func Test_updateDockerConfig(t *testing.T) {
 			if err := updateDockerConfig(tt.args.configPath); (err != nil) != tt.wantErr {
 				t.Errorf("updateDockerConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			content, err := ioutil.ReadFile(tt.args.configPath)
+			content, err := os.ReadFile(tt.args.configPath)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -87,7 +87,7 @@ func Test_writeResolveConfig(t *testing.T) {
 			if err := writeResolveConfig(tt.args.configPath); (err != nil) != tt.wantErr {
 				t.Errorf("writeResolveConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			content, err := ioutil.ReadFile(tt.args.configPath)
+			content, err := os.ReadFile(tt.args.configPath)
 			if err != nil {
 				log.Fatal(err)
 			}
