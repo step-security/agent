@@ -36,4 +36,4 @@ jobs:
 
     - name: Run coverage
       run: sudo CI=true go test -race -coverprofile=coverage.txt -covermode=atomic      
-    - uses: codecov/codecov-action@40a12dcee2df644d47232dde008099a3e9e4f865
+    - uses: codecov/codecov-action@ad3126e916f78f00edff4ed0317cf185271ccc2d # v5.4.2
