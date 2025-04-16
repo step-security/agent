@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -28,7 +27,7 @@ func Test_updateDockerConfig(t *testing.T) {
 		configPath string
 	}
 	tmpFileName := createTempFileWithContents("{ \"cgroup-parent\": \"/actions_job\"}")
-	mockDockerConfigPath, err := ioutil.TempDir("", "")
+	mockDockerConfigPath, err := os.MkdirTemp("", "")
 	if err != nil {
 		log.Fatal(err)
 	}
