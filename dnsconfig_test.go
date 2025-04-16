@@ -10,7 +10,7 @@ import (
 )
 
 func createTempFileWithContents(content string) string {
-	file, err := ioutil.TempFile("", "*.json")
+	file, err := os.CreateTemp("", "*.json")
 	if err != nil {
 		log.Fatal(err)
 	}
