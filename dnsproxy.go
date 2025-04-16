@@ -147,15 +147,15 @@ func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 		return nil, fmt.Errorf("error in response from dns.google %v", err)
 	}
 
-	var dnsReponse DNSResponse
+	var dnsResponse DNSResponse
 
-	err = json.Unmarshal([]byte(body), &dnsReponse)
+	err = json.Unmarshal([]byte(body), &dnsResponse)
 
 	if err != nil {
 		return nil, fmt.Errorf("error in response from dns.google %v", err)
 	}
 
-	for _, answer := range dnsReponse.Answer {
+	for _, answer := range dnsResponse.Answer {
 		if answer.Type == 1 {
 			if answer.TTL < 30 {
 				answer.TTL = 30 // less than 30 will cause too frequent DNS requests in audit scenario
@@ -164,7 +164,7 @@ func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unable to resolve domain %s, status %d", domain, dnsReponse.Status)
+	return nil, fmt.Errorf("unable to resolve domain %s, status %d", domain, dnsResponse.Status)
 }
 
 func getDomainFromCloudAppFormat(domain string) string {
