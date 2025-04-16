@@ -24,11 +24,13 @@ jobs:
         go-version: 1.24.1
 
     - name: Configure .netrc
+      env:
+        PAT: ${{ secrets.PAT }}
       run: |
         if [[ ! -e "~/.netrc" ]]; then
             touch ~/.netrc
         fi
-        printf "machine github.com login stepsecurity-infra-bot password ${{ secrets.PAT }}" >>~/.netrc
+        printf "machine github.com login stepsecurity-infra-bot password $PAT" >>~/.netrc
     
     - name: Create go vendor dir
       run: |
