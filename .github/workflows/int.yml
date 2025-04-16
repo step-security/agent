@@ -11,6 +11,7 @@ env:
   GOPRIVATE: github.com/step-security
 jobs:
   integration-test:
+    if: github.event.repository.fork == false
     permissions:
       contents: read
     runs-on: ubuntu-latest
