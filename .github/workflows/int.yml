@@ -37,7 +37,7 @@ jobs:
           go mod vendor
 
       - run: sudo go test -v
-      - run: go build -ldflags="-s -w" -o ./agent
+      - run: go build -ldflags="-s -w -X main.commit=latest -X main.ReleaseTag=rc" -o ./agent
       - name: Configure aws credentials
         uses: aws-actions/configure-aws-credentials@ea7b857d8a33dc2fb4ef5a724500044281b49a5e
         with:
