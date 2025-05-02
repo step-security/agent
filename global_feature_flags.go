@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	AgentTypeGitHubHosted = "githubhosted"
+	AgentTypeOSS = "agent-oss"
 )
 
 type GlobalFeatureFlags struct {
