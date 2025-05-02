@@ -4,10 +4,11 @@ import "fmt"
 
 // filled through ldflags
 var (
-	ReleaseTag = ""
-	commit     = ""
+	ReleaseTag    = ""
+	ReleaseBranch = ""
+	ReleaseCommit = ""
 )
 
 func LogBuildInfo() {
-	WriteLog(fmt.Sprintf("[buildInfo] tag=%s commit=%s \n", ReleaseTag, commit))
+	WriteLog(fmt.Sprintf("[buildInfo] tag=%s commit=%s branch=%s \n", ReleaseTag, ReleaseCommit, ReleaseBranch))
 }
