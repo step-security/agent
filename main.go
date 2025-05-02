@@ -13,6 +13,9 @@ import (
 const agentConfigFilePath = "agent.json"
 
 func main() {
+
+	LogBuildInfo()
+	
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
