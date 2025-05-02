@@ -18,7 +18,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date=123
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date=123 -X main.ReleaseTag={{.Tag}}
 
 
     # Optionally override the matrix generation and specify only the final list of targets.
