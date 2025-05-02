@@ -25,7 +25,7 @@ func (s *Sudo) disableSudo(tempDir string) error {
 	if err != nil {
 		return fmt.Errorf("error backing up sudoers file: %v", err)
 	}
-	err = os.Remove(sudoersFile)
+	err = os.Truncate(sudoersFile, 0)
 	if err != nil {
 		return fmt.Errorf("unable to delete sudoers file at %s: %v", sudoersFile, err)
 	}
