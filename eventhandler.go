@@ -40,7 +40,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	if !strings.HasPrefix(event.FileName, "/") {
 		event.FileName = path.Join(event.Path, event.FileName)
 	}
-
+	//WriteLog(fmt.Sprintf("[FileWrite] file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
 	if strings.Contains(event.FileName, "post_event.json") {
 		WriteLog("\n")
 		WriteLog("post_event called")
@@ -98,7 +98,7 @@ func isSourceCodeFile(fileName string) bool {
 		return true
 	}
 
-	return false
+	return true
 }
 
 func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
