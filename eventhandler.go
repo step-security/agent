@@ -60,45 +60,34 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	// Uncomment to log file writes (only uncomment in INT env)
 	// WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
 
-	if isSourceCodeFile(event.FileName) {
-		_, found := eventHandler.SourceCodeMap[event.FileName]
-		if !found {
-			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
-		}
-		if found {
-			isFromDifferentProcess := false
-			for _, writeEvent := range eventHandler.SourceCodeMap[event.FileName] {
-				if writeEvent.Pid != event.Pid {
-					isFromDifferentProcess = true
-				}
+	_, found := eventHandler.SourceCodeMap[event.FileName]
+	if !found {
+		eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+	}
+	if found {
+		isFromDifferentProcess := false
+		for _, writeEvent := range eventHandler.SourceCodeMap[event.FileName] {
+			if writeEvent.Pid != event.Pid {
+				isFromDifferentProcess = true
 			}
+		}
 
-			if isFromDifferentProcess {
-				eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
-				counter, found := eventHandler.FileOverwriteCounterMap[event.Exe]
-				if !found || counter < 3 {
-					checksum, err := getProgramChecksum(event.Exe)
-					if err == nil {
-						WriteLog(fmt.Sprintf("[Source code overwritten] file: %s syscall: %s by exe: %s [%s] Timestamp: %s", event.FileName, event.Syscall, event.Exe, checksum, event.Timestamp.Format("2006-01-02T15:04:05.999999999Z")))
-						// WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
-					}
-
-					eventHandler.FileOverwriteCounterMap[event.Exe]++
+		if isFromDifferentProcess {
+			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
+			counter, found := eventHandler.FileOverwriteCounterMap[event.Exe]
+			if !found || counter < 3 {
+				checksum, err := getProgramChecksum(event.Exe)
+				if err == nil {
+					WriteLog(fmt.Sprintf("[Source code overwritten] file: %s syscall: %s by exe: %s [%s] Timestamp: %s", event.FileName, event.Syscall, event.Exe, checksum, event.Timestamp.Format("2006-01-02T15:04:05.999999999Z")))
+					// WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Source code overwritten file: %s syscall: %s by exe: %s", event.FileName, event.Syscall, event.Exe))
 				}
+
+				eventHandler.FileOverwriteCounterMap[event.Exe]++
 			}
 		}
 	}
 
 	eventHandler.fileMutex.Unlock()
-}
-
-func isSourceCodeFile(fileName string) bool {
-	// If it has an extension or might be a Dockerfile
-	if strings.Contains(fileName, ".") || strings.Contains(fileName, "Dockerfile") {
-		return true
-	}
-
-	return false
 }
 
 func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
