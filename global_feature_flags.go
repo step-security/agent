@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	AgentTypeGitHubHosted = "githubhosted"
+	AgentTypeOSS = "agent-oss"
 )
 
 type GlobalFeatureFlags struct {
@@ -51,7 +51,7 @@ func (manager *GlobalFeatureFlagManager) refresh() error {
 	defer manager.mutex.Unlock()
 
 	flags := manager.apiClient.getGlobalFeatureFlags()
-
+	WriteLog(fmt.Sprintf("Global feature flags: %+v", flags))
 	manager.flags = flags
 	return nil
 }
