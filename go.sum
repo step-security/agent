@@ -104,6 +104,8 @@ github.com/step-security/armour v1.0.1 h1:+Lae8o/cbSV0HFD4wKhx4mHnQCTEJ8ndRN0gfm
 github.com/step-security/armour v1.0.1/go.mod h1:I6pTEysb5fd3Cc79tvCMVp70RqhvMYbawfoq5Gz0cPI=
 github.com/step-security/armour v1.0.4 h1:bTtvS4A9TTG83sSXW/+nno9cQOgqaueAedGdunE1eaY=
 github.com/step-security/armour v1.0.4/go.mod h1:I6pTEysb5fd3Cc79tvCMVp70RqhvMYbawfoq5Gz0cPI=
+github.com/step-security/armour v1.1.0 h1:oxJfxIOouf+KME4SzmZwukGsJSGlKmRR3ysExIeFAcY=
+github.com/step-security/armour v1.1.0/go.mod h1:I6pTEysb5fd3Cc79tvCMVp70RqhvMYbawfoq5Gz0cPI=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=
