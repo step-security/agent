@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"time"
 )
 
@@ -107,28 +109,43 @@ func (apiclient *ApiClient) getSubscriptionStatus(repo string) bool {
 
 func (apiclient *ApiClient) getGlobalFeatureFlags() GlobalFeatureFlags {
 
-	url := fmt.Sprintf("%s/global-feature-flags?agent_type=%s", apiclient.APIURL, AgentTypeGitHubHosted)
+	u, err := url.Parse(apiclient.APIURL)
+	if err != nil {
+		return GlobalFeatureFlags{}
+	}
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	u.Path = path.Join(u.Path, "global-feature-flags")
+
+	// Add query parameters
+	values := url.Values{}
+	values.Add("agent_type", AgentTypeOSS)
+	values.Add("version", ReleaseTag) // v1.3.6
+	u.RawQuery = values.Encode()
+
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 
 	if err != nil {
+		fmt.Println("Error creating request:", err)
 		return GlobalFeatureFlags{}
 	}
 
 	resp, err := apiclient.Client.Do(req)
 
 	if err != nil {
+		fmt.Println("Error sending request:", err)
 		return GlobalFeatureFlags{}
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		fmt.Println("Error reading response body:", err)
 		return GlobalFeatureFlags{}
 	}
 
 	var globalFeatureFlags GlobalFeatureFlags
 	err = json.Unmarshal(body, &globalFeatureFlags)
 	if err != nil {
+		fmt.Println("Error unmarshalling response body:", err)
 		return GlobalFeatureFlags{}
 	}
 

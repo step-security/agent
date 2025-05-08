@@ -10,7 +10,7 @@ require (
 	github.com/jarcoal/httpmock v1.3.0
 	github.com/miekg/dns v1.1.53
 	github.com/pkg/errors v0.9.1
-	github.com/step-security/armour v1.0.1
+	github.com/step-security/armour v1.1.0
 )
 
 require (
