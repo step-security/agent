@@ -12,23 +12,26 @@ env:
 
 jobs:
   test:
+    if: github.event.repository.fork == false
     permissions:
       contents: read
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@629c2de402a417ea7690ca6ce3f33229e27606a5
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
     - name: Set up Go 
-      uses: actions/setup-go@424fc82d43fa5a37540bae62709ddcc23d9520d4
+      uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
       with:
         go-version: 1.24.1
 
     - name: Configure .netrc
+      env:
+        PAT: ${{ secrets.PAT }}
       run: |
         if [[ ! -e "~/.netrc" ]]; then
             touch ~/.netrc
         fi
-        printf "machine github.com login stepsecurity-infra-bot password ${{ secrets.PAT }}" >>~/.netrc
+        printf "machine github.com login stepsecurity-infra-bot password $PAT" >>~/.netrc
     
     - name: Create go vendor dir
       run: |
@@ -36,4 +39,4 @@ jobs:
 
     - name: Run coverage
       run: sudo CI=true go test -race -coverprofile=coverage.txt -covermode=atomic      
-    - uses: codecov/codecov-action@40a12dcee2df644d47232dde008099a3e9e4f865
+    - uses: codecov/codecov-action@ad3126e916f78f00edff4ed0317cf185271ccc2d # v5.4.2

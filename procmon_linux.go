@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -177,7 +176,7 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 
 func getParentProcessId(pid string) (int, error) {
 	statPath := fmt.Sprintf("/proc/%s/stat", pid)
-	dataBytes, err := ioutil.ReadFile(statPath)
+	dataBytes, err := os.ReadFile(statPath)
 	if err != nil {
 		return -1, err
 	}
