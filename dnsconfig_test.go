@@ -43,7 +43,7 @@ func Test_updateDockerConfig(t *testing.T) {
 			args:    args{configPath: tmpFileName},
 			want:    "{\"cgroup-parent\":\"/actions_job\",\"dns\":[\"172.17.0.1\"],\"live-restore\":true}",
 			wantErr: false},
-		{name: "non existent file",
+		{name: "nonexistent file",
 			args:    args{configPath: mockDockerConfigPath},
 			want:    "{\"dns\":[\"172.17.0.1\"],\"live-restore\":true}",
 			wantErr: false},

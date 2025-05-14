@@ -60,7 +60,7 @@ var errUnlocked = errors.New("file is unlocked")
 
 // Lockfile is a process-based file lock.
 type Lockfile struct {
-	// path is the file whose existense is the lock.
+	// path is the file whose existence is the lock.
 	path string
 
 	// pid is our PID.
