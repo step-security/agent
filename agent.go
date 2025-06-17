@@ -20,6 +20,11 @@ const (
 	EgressPolicyBlock                = "block"
 )
 
+var (
+	dnsConfig *DnsConfig = nil
+	sudo      *Sudo      = nil
+)
+
 type DNSServer interface {
 	ListenAndServe() error
 }
@@ -57,6 +62,8 @@ type IPTables interface {
 func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	dockerDNSServer DNSServer, iptables *Firewall, nflog AgentNflogger,
 	cmd Command, resolvdConfigPath, dockerDaemonConfigPath, tempDir string) error {
+
+	defer panicHandler()
 
 	// Passed to each go routine, if anyone fails, the program fails
 	errc := make(chan error)
@@ -130,8 +137,8 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		WriteLog("started process monitor")
 	}
 
-	dnsConfig := DnsConfig{}
-	sudo := Sudo{}
+	dnsConfig = &DnsConfig{}
+	sudo = &Sudo{}
 	var ipAddressEndpoints []ipAddressEndpoint
 
 	if config.DisableSudoAndContainers {
@@ -380,23 +387,30 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 }
 
 func RevertChanges(iptables *Firewall, nflog AgentNflogger,
-	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string, dnsConfig DnsConfig, sudo Sudo) {
+	cmd Command, resolvdConfigPath, dockerDaemonConfigPath string, dnsConfig *DnsConfig, sudo *Sudo) {
 	err := RevertFirewallChanges(iptables)
 	if err != nil {
 		WriteLog(fmt.Sprintf("Error in RevertChanges %v", err))
 	}
-	err = dnsConfig.RevertDNSServer(cmd, resolvdConfigPath)
-	if err != nil {
-		WriteLog(fmt.Sprintf("Error in reverting DNS server changes %v", err))
+
+	if dnsConfig != nil {
+		err = dnsConfig.RevertDNSServer(cmd, resolvdConfigPath)
+		if err != nil {
+			WriteLog(fmt.Sprintf("Error in reverting DNS server changes %v", err))
+		}
+		err = dnsConfig.RevertDockerDNSServer(cmd, dockerDaemonConfigPath)
+		if err != nil {
+			WriteLog(fmt.Sprintf("Error in reverting docker DNS server changes %v", err))
+		}
 	}
-	err = dnsConfig.RevertDockerDNSServer(cmd, dockerDaemonConfigPath)
-	if err != nil {
-		WriteLog(fmt.Sprintf("Error in reverting docker DNS server changes %v", err))
+
+	if sudo != nil {
+		err = sudo.revertDisableSudo()
+		if err != nil {
+			WriteLog(fmt.Sprintf("Error in reverting sudo changes %v", err))
+		}
 	}
-	err = sudo.revertDisableSudo()
-	if err != nil {
-		WriteLog(fmt.Sprintf("Error in reverting sudo changes %v", err))
-	}
+
 	WriteLog("Reverted changes")
 }
 
