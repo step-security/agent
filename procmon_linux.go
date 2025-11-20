@@ -110,7 +110,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("Net monitor added for TCP (connect)")
 
 	// syscall sendto (for UDP)
-	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S sendto -k %s", netMonitorTag))
+	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S sendto -S sendmsg -k %s", netMonitorTag))
 
 	actualBytes, _ = rule.Build(r)
 
@@ -119,19 +119,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to add audit rule for syscall sendto")
 	}
 
-	WriteLog("Net monitor added for UDP (sendto)")
-
-	// syscall sendmsg (for UDP)
-	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S sendmsg -k %s", netMonitorTag))
-
-	actualBytes, _ = rule.Build(r)
-
-	if err = client.AddRule(actualBytes); err != nil {
-		WriteLog(fmt.Sprintf("failed to add audit rule for sendmsg %v", err))
-		errc <- errors.Wrap(err, "failed to add audit rule for syscall sendmsg")
-	}
-
-	WriteLog("Net monitor added for UDP (sendmsg)")
+	WriteLog("Net monitor added for UDP (sendto & sendmsg)")
 
 	// syscall process start
 	r, _ = flags.Parse(fmt.Sprintf("-a exit,always -S execve -k %s", processMonitorTag))
