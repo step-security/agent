@@ -71,6 +71,7 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 	packet := gopacket.NewPacket(data, layers.LayerTypeIPv4, gopacket.Default)
 	port := ""
 	isSYN := false
+	isUDP := false
 	// Get the TCP layer from this packet
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		// Get actual TCP data from this layer
@@ -78,6 +79,11 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 		port = tcp.DstPort.String()
 		isSYN = tcp.SYN
 
+	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
+		// Get actual UDP data from this layer
+		udp, _ := udpLayer.(*layers.UDP)
+		port = udp.DstPort.String()
+		isUDP = true
 	}
 
 	// Get the IP layer from this packet
@@ -90,7 +96,7 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 		if !found {
 			ipAddresses[ipv4Address] = 1
 
-			if isSYN {
+			if isSYN || isUDP {
 				if netMonitor.Status == "Dropped" {
 
 					netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
