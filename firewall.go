@@ -152,6 +152,13 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 		return errors.Wrap(err, "failed to add rule")
 	}
 
+	// Log blocked traffic - UDP packets
+	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, "udp", "-j", "NFLOG", "--nflog-group", "100")
+
+	if err != nil {
+		return errors.Wrap(err, "failed to add UDP NFLOG rule")
+	}
+
 	// Block all other traffic
 	err = ipt.Append(filterTable, chain, direction, netInterface, protocol, allProtocols, target, reject)
 
