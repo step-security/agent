@@ -37,14 +37,22 @@ jobs:
           go mod vendor
 
       - run: sudo go test -v
-      - run: go build -ldflags="-s -w" -o ./agent
+
+      - uses: goreleaser/goreleaser-action@5df302e5e9e4c66310a6b6493a8865b12c555af2
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --snapshot --clean --config releasers/int.yml
+
       - name: Configure aws credentials
         uses: aws-actions/configure-aws-credentials@ea7b857d8a33dc2fb4ef5a724500044281b49a5e
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
-      - run: aws s3 cp ./agent s3://step-security-agent/refs/heads/int/agent --acl public-read
+          
+
+      - run: aws s3 cp ./dist/agent_linux_amd64_v1/agent s3://step-security-agent/refs/heads/int/agent --acl public-read
       - name: Integration test
         uses: docker://ghcr.io/step-security/integration-test/int:latest
         env:
