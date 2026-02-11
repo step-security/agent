@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
@@ -88,12 +89,20 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 	}
 
 	// Agent uses HTTPs to resolve domain names
-	for _, dnsServer := range dnsServers {
-		err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
-			destination, dnsServer, target, accept)
+	// Only apply UID filtering for OUTPUT chain
+	if chain == outputChain {
+		agentUID := fmt.Sprintf("%d", os.Getuid())
+		for _, dnsServer := range dnsServers {
+			err = ipt.Insert(filterTable, chain, 1, direction, netInterface,
+				"-m", "owner", "--uid-owner", agentUID,
+				protocol, "tcp",
+				destination, dnsServer,
+				destinationPort, "443",
+				target, accept)
 
-		if err != nil {
-			return errors.Wrapf(err, "failed to add rule for DNS server %s", dnsServer)
+			if err != nil {
+				return errors.Wrapf(err, "failed to add rule for DNS server %s", dnsServer)
+			}
 		}
 	}
 
