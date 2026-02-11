@@ -90,6 +90,7 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 
 	// Agent uses HTTPs to resolve domain names
 	// Only apply UID filtering for OUTPUT chain
+	// Insert DNS server rules at position 1 (top of chain) to ensure they're evaluated first
 	if chain == outputChain {
 		agentUID := fmt.Sprintf("%d", os.Getuid())
 		for _, dnsServer := range dnsServers {
