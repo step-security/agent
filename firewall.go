@@ -78,23 +78,12 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 		}
 	}
 
-	for _, endpoint := range endpoints {
-		err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
-			destination, endpoint.ipAddress,
-			destinationPort, endpoint.port, target, accept)
-
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to append endpoint rule ip:%s, port:%s", endpoint.ipAddress, endpoint.port))
-		}
-	}
-
 	// Agent uses HTTPs to resolve domain names
 	// Only apply UID filtering for OUTPUT chain
-	// Insert DNS server rules at position 1 (top of chain) to ensure they're evaluated first
 	if chain == outputChain {
 		agentUID := fmt.Sprintf("%d", os.Getuid())
 		for _, dnsServer := range dnsServers {
-			err = ipt.Insert(filterTable, chain, 1, direction, netInterface,
+			err = ipt.Append(filterTable, chain, direction, netInterface,
 				"-m", "owner", "--uid-owner", agentUID,
 				protocol, "tcp",
 				destination, dnsServer,
@@ -104,6 +93,16 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 			if err != nil {
 				return errors.Wrapf(err, "failed to add rule for DNS server %s", dnsServer)
 			}
+		}
+	}
+
+	for _, endpoint := range endpoints {
+		err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
+			destination, endpoint.ipAddress,
+			destinationPort, endpoint.port, target, accept)
+
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to append endpoint rule ip:%s, port:%s", endpoint.ipAddress, endpoint.port))
 		}
 	}
 
