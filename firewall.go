@@ -85,7 +85,7 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 		for _, dnsServer := range dnsServers {
 			err = ipt.Append(filterTable, chain, direction, netInterface,
 				"-m", "owner", "--uid-owner", agentUID,
-				protocol, "tcp",
+				protocol, tcp,
 				destination, dnsServer,
 				destinationPort, "443",
 				target, accept)
