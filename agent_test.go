@@ -159,6 +159,9 @@ func TestRun(t *testing.T) {
 	httpmock.RegisterResponder("GET", "https://apiurl/v1/github/owner/repo/actions/subscription",
 		httpmock.NewStringResponder(403, ""))
 
+	httpmock.RegisterResponder("GET", "https://apiurl/v1/global-feature-flags?agent_type=agent-oss&version=",
+		httpmock.NewStringResponder(200, `{"agent_type":"agent-oss","enable_armour":false}`))
+
 	tests := []struct {
 		name    string
 		args    args

@@ -6,7 +6,7 @@ release-process:
   reproducible-build:
     - artifact: agent_{{.Version}}_linux_amd64.tar.gz
       binary: agent
-      build-command: go build -trimpath -ldflags="-s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date=123"
+      build-command: go build -trimpath -ldflags="-s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date=123 -X main.ReleaseTag={{.Tag}}"
       go-version: 1.19.8      
   pipeline:
     github-action:

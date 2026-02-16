@@ -18,11 +18,6 @@ func getPidsOfInterest() []uint32 {
 	// our process
 	out = append(out, uint32(os.Getpid()))
 
-	// systemd-resolved
-	systemdResolvePid, _ := pidOf("systemd-resolved")
-
-	out = append(out, uint32(systemdResolvePid))
-
 	return out
 }
 
@@ -46,9 +41,6 @@ func getFilesOfInterest() []string {
 
 func getProcFilesOfInterest() []string {
 	out := []string{}
-
-	// our memory files
-	out = append(out, getProcMemFiles(uint64(os.Getpid()))...)
 
 	// runner worker memory files
 	runnerWorker, _ := pidOf("Runner.Worker")
@@ -94,7 +86,6 @@ func getProcMemFiles(pid uint64) []string {
 	}
 
 	out = []string{
-		fmt.Sprintf("/proc/%d/maps", pid),
 		fmt.Sprintf("/proc/%d/mem", pid),
 	}
 
