@@ -20,3 +20,6 @@ coverage.txt
 
 vendor
 private-src
+
+dist
+local
