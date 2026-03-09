@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -153,7 +152,7 @@ func printContainerInfo(pid, ppid string) {
 	}
 
 	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
-	content, err := ioutil.ReadFile(cgroupPath)
+	content, err := os.ReadFile(cgroupPath)
 	if err != nil {
 		WriteLog(fmt.Sprintf("cgroup not found %v", err))
 	} else {
@@ -213,7 +212,7 @@ func (eventHandler *EventHandler) HandleEvent(event *Event) {
 }
 
 func GetContainerIdByPid(cgroupPath string) string {
-	content, err := ioutil.ReadFile(cgroupPath)
+	content, err := os.ReadFile(cgroupPath)
 	if err != nil {
 		// WriteLog(fmt.Sprintf("error reading cgrouppath: %s : %v", cgroupPath, err))
 		return ""

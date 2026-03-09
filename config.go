@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
@@ -50,7 +50,7 @@ type configFile struct {
 // init reads the config file for the agent and initializes config settings
 func (c *config) init(configFilePath string) error {
 	var configFile configFile
-	data, err := ioutil.ReadFile(configFilePath)
+	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return errors.Wrap(err, "failed to read config file")
 	}
