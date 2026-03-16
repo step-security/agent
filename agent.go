@@ -377,10 +377,13 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 		}
 	}
 
-	stepsecurity := Endpoint{domainName: "agent.api.stepsecurity.io", port: 443} // Should be implicit based on user feedback
+	stepsecurity := Endpoint{domainName: "agent.api.stepsecurity.io", port: 443}             // Should be implicit based on user feedback
+	stepsecurityTelemetry := Endpoint{domainName: "prod.app-api.stepsecurity.io", port: 443} // Telemetry endpoint for sending DNS and net connections to StepSecurity
+
 	if !disableTelemetry {
 		// allowing only if disable_telemetry is set to false
 		normalEndpoints[stepsecurity.domainName] = append(normalEndpoints[stepsecurity.domainName], stepsecurity)
+		normalEndpoints[stepsecurityTelemetry.domainName] = append(normalEndpoints[stepsecurityTelemetry.domainName], stepsecurityTelemetry)
 	}
 
 	return normalEndpoints, wildcardEndpoints
