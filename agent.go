@@ -67,7 +67,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	apiclient := &ApiClient{Client: &http.Client{Timeout: 3 * time.Second}, APIURL: config.APIURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy, OneTimeKey: config.OneTimeKey}
+	apiclient := &ApiClient{Client: &http.Client{Timeout: 3 * time.Second}, APIURL: config.APIURL, TelemetryURL: config.TelemetryURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy, OneTimeKey: config.OneTimeKey}
 
 	config.OneTimeKey = ""
 	// TODO: pass in an iowriter/ use log library
