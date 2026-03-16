@@ -205,8 +205,6 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 
 	eventHandler.netMutex.Unlock()
 
-	eventHandler.submitDNSEvent(reverseLookUp)
-
 	eventHandler.submitNetworkEvent(event)
 }
 
