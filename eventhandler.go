@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/step-security/armour/armour"
 )
 
 type EventHandler struct {
@@ -89,6 +90,8 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
+	eventHandler.submitFileEvent(event)
+
 	eventHandler.fileMutex.Unlock()
 }
 
@@ -123,6 +126,8 @@ func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 	} else {
 		eventHandler.procMutex.Unlock()
 	}
+
+	eventHandler.submitProcessEvent(event)
 }
 
 /*
@@ -199,6 +204,10 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 	}
 
 	eventHandler.netMutex.Unlock()
+
+	eventHandler.submitDNSEvent(reverseLookUp)
+
+	eventHandler.submitNetworkEvent(event)
 }
 
 func (eventHandler *EventHandler) HandleEvent(event *Event) {
@@ -439,4 +448,69 @@ func isPrivateIPAddress(ipAddress string) bool {
 
 func isIPv6(ip string) bool {
 	return strings.Contains(ip, ":")
+}
+
+func (eventHandler *EventHandler) submitProcessEvent(event *Event) {
+	if !IsCustomDetectionRulesEnabled() {
+		return
+	}
+	if GlobalArmour == nil {
+		return
+	}
+	dm := GlobalArmour.DetectionManager()
+	if dm == nil {
+		return
+	}
+	dm.SubmitProcess(&armour.ProcessDetectionEvent{
+		Pid:       event.Pid,
+		PPid:      event.PPid,
+		Exe:       event.Exe,
+		Arguments: event.ProcessArguments,
+		Cwd:       event.Path,
+		Timestamp: event.Timestamp,
+	})
+}
+
+// submitFileEvent submits a file event to the detection manager.
+func (eventHandler *EventHandler) submitFileEvent(event *Event) {
+	if !IsCustomDetectionRulesEnabled() {
+		return
+	}
+	if GlobalArmour == nil {
+		return
+	}
+	dm := GlobalArmour.DetectionManager()
+	if dm == nil {
+		return
+	}
+	dm.SubmitFile(&armour.FileDetectionEvent{
+		Syscall:   event.Syscall,
+		FileName:  filepath.Base(event.FileName),
+		Path:      event.FileName,
+		Exe:       event.Exe,
+		Pid:       event.Pid,
+		PPid:      event.PPid,
+		Timestamp: event.Timestamp,
+	})
+}
+
+// submitNetworkEvent submits a network event to the detection manager.
+func (eventHandler *EventHandler) submitNetworkEvent(event *Event) {
+	if GlobalArmour == nil {
+		return
+	}
+	dm := GlobalArmour.DetectionManager()
+	if dm == nil {
+		return
+	}
+
+	dm.SubmitNetwork(&armour.NetworkDetectionEvent{
+		Pid:       event.Pid,
+		PPid:      event.PPid,
+		Exe:       event.Exe,
+		Dest:      event.IPAddress,
+		DestIP:    event.IPAddress,
+		DestPort:  event.Port,
+		Timestamp: event.Timestamp,
+	})
 }

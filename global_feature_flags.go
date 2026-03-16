@@ -11,8 +11,9 @@ const (
 )
 
 type GlobalFeatureFlags struct {
-	AgentType    string `json:"agent_type"`
-	EnableArmour bool   `json:"enable_armour"`
+	AgentType                  string `json:"agent_type"`
+	EnableArmour               bool   `json:"enable_armour"`
+	EnableCustomDetectionRules bool   `json:"enable_custom_detection_rules"`
 }
 
 // GlobalFeatureFlagManager manages fetching and caching of global feature flags.
@@ -78,4 +79,9 @@ func GetGlobalFeatureFlags() GlobalFeatureFlags {
 func IsArmourEnabled() bool {
 	flags := GetGlobalFeatureFlags()
 	return flags.EnableArmour
+}
+
+func IsCustomDetectionRulesEnabled() bool {
+	flags := GetGlobalFeatureFlags()
+	return flags.EnableCustomDetectionRules
 }
