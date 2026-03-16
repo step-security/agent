@@ -167,15 +167,18 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	WriteLog("\n")
 	WriteLog("updated resolved")
 
-	// Change DNS for docker, causes process in containers to use agent's DNS proxy
-	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
-		WriteLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
-		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
-		return err
-	}
+	// we uninstall docker using go routine, handle case where that routine finishes before we come here
+	if !config.DisableSudoAndContainers {
+		// Change DNS for docker, causes process in containers to use agent's DNS proxy
+		if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
+			WriteLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
+			return err
+		}
 
-	WriteLog("\n")
-	WriteLog("set docker config\n")
+		WriteLog("\n")
+		WriteLog("set docker config\n")
+	}
 
 	if config.EgressPolicy == EgressPolicyAudit {
 		netMonitor := NetworkMonitor{
@@ -242,13 +245,17 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 		conf.Files = append(conf.Files, getFilesOfInterest()...)
 
-		mArmour := armour.NewArmour(ctx, conf)
-		err := mArmour.Attach()
+		err := InitArmour(ctx, conf)
 		if err != nil {
 			WriteLog("Armour attachment failed")
 		} else {
-			defer mArmour.Detach()
+			if GlobalArmour != nil {
+				defer GlobalArmour.Detach()
+			}
 			WriteLog("Armour attached")
+			if IsCustomDetectionRulesEnabled() {
+				WriteLog("[armour] Custom detection rules enabled")
+			}
 		}
 	}
 
