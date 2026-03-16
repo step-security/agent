@@ -41,6 +41,7 @@ type NetworkConnection struct {
 type ApiClient struct {
 	Client           *http.Client
 	APIURL           string
+	TelemetryURL     string
 	DisableTelemetry bool
 	EgressPolicy     string
 	OneTimeKey       string
@@ -57,7 +58,7 @@ func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAdd
 		dnsRecord.ResolvedIPAddress = ipAddress
 		dnsRecord.TimeStamp = time.Now().UTC()
 
-		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/dns", apiclient.APIURL, repo, correlationId)
+		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/dns", apiclient.TelemetryURL, repo, correlationId)
 
 		return apiclient.sendApiRequest("POST", url, dnsRecord)
 	}
@@ -76,7 +77,7 @@ func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, po
 		networkConnection.TimeStamp = timestamp
 		networkConnection.Tool = tool
 
-		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/networkconnection", apiclient.APIURL, repo, correlationId)
+		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/networkconnection", apiclient.TelemetryURL, repo, correlationId)
 
 		return apiclient.sendApiRequest("POST", url, networkConnection)
 	}
