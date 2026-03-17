@@ -239,6 +239,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 				OneTimeKey:       config.OneTimeKey,
 				DisableTelemetry: config.DisableTelemetry,
 			},
+			EnableCustomDetectionRules: IsCustomDetectionRulesEnabled(),
 		}
 
 		conf.Files = append(conf.Files, getProcFilesOfInterest()...)
