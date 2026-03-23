@@ -90,9 +90,9 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
-	eventHandler.submitFileEvent(event)
-
 	eventHandler.fileMutex.Unlock()
+
+	eventHandler.submitFileEvent(event)
 }
 
 func isSourceCodeFile(fileName string) bool {
