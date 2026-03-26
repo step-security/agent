@@ -11,6 +11,7 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
+	"github.com/step-security/armour/armour"
 )
 
 type DNSProxy struct {
@@ -239,6 +240,8 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data)
 
+	go proxy.submitDNSEvent(answer.Data)
+
 	return answer.Data, nil
 
 }
@@ -294,6 +297,23 @@ func (proxy *DNSProxy) processTypeA(q *dns.Question, requestMsg *dns.Msg) (*dns.
 	proxy.SetReverseIPLookup(q.Name, ip)
 
 	return &rr, nil
+}
+
+// submitDNSEvent submits a DNS event to the detection manager.
+func (proxy *DNSProxy) submitDNSEvent(dest string) {
+	if !IsCustomDetectionRulesEnabled() {
+		return
+	}
+	if GlobalArmour == nil {
+		return
+	}
+	dm := GlobalArmour.DetectionManager()
+	if dm == nil {
+		return
+	}
+	dm.SubmitNetwork(&armour.NetworkDetectionEvent{
+		Dest: dest,
+	})
 }
 
 func startDNSServer(dnsProxy *DNSProxy, server DNSServer, errc chan error) {

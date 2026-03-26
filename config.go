@@ -16,6 +16,7 @@ type config struct {
 	RunId                    string
 	WorkingDirectory         string
 	APIURL                   string
+	TelemetryURL             string
 	OneTimeKey               string
 	Endpoints                map[string][]Endpoint
 	EgressPolicy             string
@@ -37,6 +38,7 @@ type configFile struct {
 	RunId                    string `json:"run_id"`
 	WorkingDirectory         string `json:"working_directory"`
 	APIURL                   string `json:"api_url"`
+	TelemetryURL             string `json:"telemetry_url"`
 	OneTimeKey               string `json:"one_time_key"`
 	AllowedEndpoints         string `json:"allowed_endpoints"`
 	EgressPolicy             string `json:"egress_policy"`
@@ -65,6 +67,10 @@ func (c *config) init(configFilePath string) error {
 	c.RunId = configFile.RunId
 	c.WorkingDirectory = configFile.WorkingDirectory
 	c.APIURL = configFile.APIURL
+	c.TelemetryURL = configFile.TelemetryURL
+	if c.TelemetryURL == "" {
+		c.TelemetryURL = c.APIURL
+	}
 	c.Endpoints = parseEndpoints(configFile.AllowedEndpoints)
 	c.EgressPolicy = configFile.EgressPolicy
 	c.DisableTelemetry = configFile.DisableTelemetry

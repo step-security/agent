@@ -91,3 +91,7 @@ func getProcMemFiles(pid uint64) []string {
 
 	return out
 }
+
+func getRunnerWorkerPID() (uint64, error) {
+	return pidOf("Runner.Worker")
+}
