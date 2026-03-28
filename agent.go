@@ -67,7 +67,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		return err
 	}
 
-	apiclient := &ApiClient{Client: &http.Client{Timeout: 3 * time.Second}, APIURL: config.APIURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy, OneTimeKey: config.OneTimeKey}
+	apiclient := &ApiClient{Client: &http.Client{Timeout: 3 * time.Second}, APIURL: config.APIURL, TelemetryURL: config.TelemetryURL, DisableTelemetry: config.DisableTelemetry, EgressPolicy: config.EgressPolicy, OneTimeKey: config.OneTimeKey}
 
 	config.OneTimeKey = ""
 	// TODO: pass in an iowriter/ use log library
@@ -167,15 +167,18 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	WriteLog("\n")
 	WriteLog("updated resolved")
 
-	// Change DNS for docker, causes process in containers to use agent's DNS proxy
-	if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
-		WriteLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
-		RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
-		return err
-	}
+	// we uninstall docker using go routine, handle case where that routine finishes before we come here
+	if !config.DisableSudoAndContainers {
+		// Change DNS for docker, causes process in containers to use agent's DNS proxy
+		if err := dnsConfig.SetDockerDNSServer(cmd, dockerDaemonConfigPath, tempDir); err != nil {
+			WriteLog(fmt.Sprintf("Error setting DNS server for docker %v", err))
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
+			return err
+		}
 
-	WriteLog("\n")
-	WriteLog("set docker config\n")
+		WriteLog("\n")
+		WriteLog("set docker config\n")
+	}
 
 	if config.EgressPolicy == EgressPolicyAudit {
 		netMonitor := NetworkMonitor{
@@ -233,22 +236,27 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 				APIURL:           config.APIURL,
 				Repo:             config.Repo,
 				CorrelationID:    config.CorrelationId,
-				OneTimeKey:       config.OneTimeKey,
+				OneTimeKey:       apiclient.OneTimeKey,
 				DisableTelemetry: config.DisableTelemetry,
 			},
+			EnableCustomDetectionRules: IsCustomDetectionRulesEnabled(),
 		}
 
 		conf.Files = append(conf.Files, getProcFilesOfInterest()...)
 
 		conf.Files = append(conf.Files, getFilesOfInterest()...)
 
-		mArmour := armour.NewArmour(ctx, conf)
-		err := mArmour.Attach()
+		err := InitArmour(ctx, conf)
 		if err != nil {
 			WriteLog("Armour attachment failed")
 		} else {
-			defer mArmour.Detach()
+			if GlobalArmour != nil {
+				defer GlobalArmour.Detach()
+			}
 			WriteLog("Armour attached")
+			if IsCustomDetectionRulesEnabled() {
+				WriteLog("[armour] Custom detection rules enabled")
+			}
 		}
 	}
 
@@ -370,10 +378,13 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 		}
 	}
 
-	stepsecurity := Endpoint{domainName: "agent.api.stepsecurity.io", port: 443} // Should be implicit based on user feedback
+	stepsecurity := Endpoint{domainName: "agent.api.stepsecurity.io", port: 443}             // Should be implicit based on user feedback
+	stepsecurityTelemetry := Endpoint{domainName: "prod.app-api.stepsecurity.io", port: 443} // Telemetry endpoint for sending DNS and net connections to StepSecurity
+
 	if !disableTelemetry {
 		// allowing only if disable_telemetry is set to false
 		normalEndpoints[stepsecurity.domainName] = append(normalEndpoints[stepsecurity.domainName], stepsecurity)
+		normalEndpoints[stepsecurityTelemetry.domainName] = append(normalEndpoints[stepsecurityTelemetry.domainName], stepsecurityTelemetry)
 	}
 
 	return normalEndpoints, wildcardEndpoints
