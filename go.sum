@@ -189,6 +189,8 @@ github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af h1:Sp5TG9f7K39yf
 github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/step-security/armour v1.2.0 h1:DzGsX0HOWiMJpD8wo5k5bJKohWbjk3WYm6x13UNzsTE=
 github.com/step-security/armour v1.2.0/go.mod h1:uopgPKW3HfuP05Wc0QeaN9buiy/XJH2B5HdNuM8sBLE=
+github.com/step-security/armour v1.2.1 h1:WFhrnUanh60c+jUXBsEX01jS5pi51Cs28wq//tLiuqU=
+github.com/step-security/armour v1.2.1/go.mod h1:uopgPKW3HfuP05Wc0QeaN9buiy/XJH2B5HdNuM8sBLE=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
