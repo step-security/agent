@@ -131,6 +131,7 @@ func TestDNSProxy_getResponse(t *testing.T) {
 				Cache:             tt.fields.Cache,
 				ApiClient:         apiclient,
 				EgressPolicy:      tt.fields.EgressPolicy,
+				GlobalBlocklist:   NewGlobalBlocklist(nil),
 				AllowedEndpoints:  tt.fields.AllowedEndpoints,
 				WildCardEndpoints: tt.fields.WildCardEndpoints,
 				ReverseIPLookup:   make(map[string]string),
@@ -145,6 +146,42 @@ func TestDNSProxy_getResponse(t *testing.T) {
 				t.Errorf("DNSProxy.getResponse() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDNSProxy_getResponse_GlobalBlocklist(t *testing.T) {
+	globalBlocklist := NewGlobalBlocklist(&GlobalBlocklistResponse{
+		Domains:         []CompromisedEndpoint{{Endpoint: "blocked.com", Reason: "compromised"}},
+		WildcardDomains: []CompromisedEndpoint{{Endpoint: "*.blocked.example", Reason: "wildcard compromised"}},
+	})
+
+	blockCache := InitCache(EgressPolicyBlock)
+	rrBlocked, _ := dns.NewRR(fmt.Sprintf("blocked.com. IN A %s", StepSecuritySinkHoleIPAddress))
+	rrWildcardBlocked, _ := dns.NewRR(fmt.Sprintf("foo.blocked.example. IN A %s", StepSecuritySinkHoleIPAddress))
+
+	proxy := &DNSProxy{
+		Cache:           &blockCache,
+		ApiClient:       &ApiClient{Client: &http.Client{}, APIURL: agentApiBaseUrl},
+		EgressPolicy:    EgressPolicyBlock,
+		GlobalBlocklist: globalBlocklist,
+		ReverseIPLookup: make(map[string]string),
+		Iptables:        &Firewall{&MockIPTables{}},
+	}
+
+	response, err := proxy.getResponse(&dns.Msg{Question: []dns.Question{{Name: "blocked.com.", Qtype: dns.TypeA}}})
+	if err != nil {
+		t.Fatalf("DNSProxy.getResponse() error = %v", err)
+	}
+	if !reflect.DeepEqual(response, &dns.Msg{Answer: []dns.RR{rrBlocked}}) {
+		t.Fatalf("DNSProxy.getResponse() = %v, want %v", response, &dns.Msg{Answer: []dns.RR{rrBlocked}})
+	}
+
+	response, err = proxy.getResponse(&dns.Msg{Question: []dns.Question{{Name: "foo.blocked.example.", Qtype: dns.TypeA}}})
+	if err != nil {
+		t.Fatalf("DNSProxy.getResponse() error = %v", err)
+	}
+	if !reflect.DeepEqual(response, &dns.Msg{Answer: []dns.RR{rrWildcardBlocked}}) {
+		t.Fatalf("DNSProxy.getResponse() = %v, want %v", response, &dns.Msg{Answer: []dns.RR{rrWildcardBlocked}})
 	}
 }
 
@@ -167,6 +204,7 @@ func TestDNSProxy_auditCacheTTL(t *testing.T) {
 		Cache:           &cache,
 		ApiClient:       apiclient,
 		EgressPolicy:    EgressPolicyAudit,
+		GlobalBlocklist: NewGlobalBlocklist(nil),
 		ReverseIPLookup: make(map[string]string),
 	}
 

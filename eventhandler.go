@@ -193,7 +193,15 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
 			}
 			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
-			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", event.Timestamp, tool)
+			status := ""
+			matchedPolicy := ""
+			reason := ""
+			if eventHandler.DNSProxy.GlobalBlocklist != nil && eventHandler.DNSProxy.GlobalBlocklist.IsIPAddressBlocked(event.IPAddress) {
+				status = "Dropped"
+				matchedPolicy = GlobalBlocklistMatchedPolicy
+				reason = eventHandler.DNSProxy.GlobalBlocklist.BlockedIPAddressReason(event.IPAddress)
+			}
+			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, status, matchedPolicy, reason, event.Timestamp, tool)
 			process := ""
 			if image == "" {
 				process = tool.Name
