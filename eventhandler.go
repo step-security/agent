@@ -36,7 +36,6 @@ type EventHandler struct {
 var classAPrivateSubnet, classBPrivateSubnet, classCPrivateSubnet, loopBackSubnet, ipv6LinkLocalSubnet, ipv6LocalSubnet *net.IPNet
 
 func (eventHandler *EventHandler) handleFileEvent(event *Event) {
-	eventHandler.fileMutex.Lock()
 
 	if !strings.HasPrefix(event.FileName, "/") {
 		event.FileName = path.Join(event.Path, event.FileName)
@@ -62,11 +61,13 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	// WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
 
 	if isSourceCodeFile(event.FileName) {
+		eventHandler.fileMutex.Lock()
+		defer eventHandler.fileMutex.Unlock()
+
 		_, found := eventHandler.SourceCodeMap[event.FileName]
 		if !found {
 			eventHandler.SourceCodeMap[event.FileName] = append(eventHandler.SourceCodeMap[event.FileName], event)
-		}
-		if found {
+		} else {
 			isFromDifferentProcess := false
 			for _, writeEvent := range eventHandler.SourceCodeMap[event.FileName] {
 				if writeEvent.Pid != event.Pid {
@@ -90,8 +91,6 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 		}
 	}
 
-	eventHandler.fileMutex.Unlock()
-
 	eventHandler.submitFileEvent(event)
 }
 
@@ -106,25 +105,21 @@ func isSourceCodeFile(fileName string) bool {
 
 func (eventHandler *EventHandler) handleProcessEvent(event *Event) {
 	eventHandler.procMutex.Lock()
-
 	_, found := eventHandler.ProcessMap[event.Pid]
-
 	if !found {
 		eventHandler.ProcessMap[event.Pid] = &Process{PID: event.Pid, PPid: event.PPid, Exe: event.Exe, Arguments: event.ProcessArguments}
-		eventHandler.procMutex.Unlock()
+	}
+	eventHandler.procMutex.Unlock()
 
-		if event.Euid == "0" {
-			image := eventHandler.GetContainerByPid(event.Pid)
-			if image == "" {
-				if event.Exe != "" {
-					if eventHandler.IsStartedByRunner(event.PPid, event.Exe) {
-						WriteLog(fmt.Sprintf("sudo process started: Exe: %s, Arguments: %v", event.Exe, event.ProcessArguments))
-					}
+	if !found && event.Euid == "0" {
+		image := eventHandler.GetContainerByPid(event.Pid)
+		if image == "" {
+			if event.Exe != "" {
+				if eventHandler.IsStartedByRunner(event.PPid, event.Exe) {
+					WriteLog(fmt.Sprintf("sudo process started: Exe: %s, Arguments: %v", event.Exe, event.ProcessArguments))
 				}
 			}
 		}
-	} else {
-		eventHandler.procMutex.Unlock()
 	}
 
 	eventHandler.submitProcessEvent(event)
@@ -168,7 +163,6 @@ func printContainerInfo(pid, ppid string) {
 }*/
 
 func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
-	eventHandler.netMutex.Lock()
 
 	if !isPrivateIPAddress(event.IPAddress) &&
 		// commenting out AzureIPAddress since it should not be called
@@ -179,7 +173,12 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 
 		cacheKey := fmt.Sprintf("%s%s%s", event.Pid, event.IPAddress, event.Port)
 
+		eventHandler.netMutex.Lock()
 		_, found := eventHandler.ProcessConnectionMap[cacheKey]
+		if !found {
+			eventHandler.ProcessConnectionMap[cacheKey] = true
+		}
+		eventHandler.netMutex.Unlock()
 
 		if !found {
 			tool := Tool{}
@@ -207,11 +206,8 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 				process = tool.Name
 			}
 			WriteLog(fmt.Sprintf("endpoint called ip address:port %s:%s, domain: %s, pid: %s, process: %s", event.IPAddress, event.Port, reverseLookUp, event.Pid, process))
-			eventHandler.ProcessConnectionMap[cacheKey] = true
 		}
 	}
-
-	eventHandler.netMutex.Unlock()
 
 	eventHandler.submitNetworkEvent(event)
 }
@@ -270,15 +266,15 @@ func (eventHandler *EventHandler) GetContainerByPid(pid string) string {
 	procContainer := ""
 
 	// see if already calculated
-	eventHandler.procMutex.Lock()
+	eventHandler.procMutex.RLock()
 	process, found := eventHandler.ProcessMap[pid]
 	if found {
 		if process.Container != "" {
-			eventHandler.procMutex.Unlock()
+			eventHandler.procMutex.RUnlock()
 			return process.Container
 		}
 	}
-	eventHandler.procMutex.Unlock()
+	eventHandler.procMutex.RUnlock()
 
 	cgroupPath := fmt.Sprintf("/proc/%s/cgroup", pid)
 	containerId := GetContainerIdByPid(cgroupPath)
@@ -340,9 +336,9 @@ func (eventHandler *EventHandler) IsStartedByRunner(ppid, exe string) bool {
 	}
 
 	// In some cases the process has already exited, so get from map first
-	eventHandler.procMutex.Lock()
+	eventHandler.procMutex.RLock()
 	parentProcess, found := eventHandler.ProcessMap[ppid]
-	eventHandler.procMutex.Unlock()
+	eventHandler.procMutex.RUnlock()
 
 	if found {
 		return eventHandler.IsStartedByRunner(parentProcess.PPid, parentProcess.Exe)
@@ -368,9 +364,9 @@ func (eventHandler *EventHandler) GetToolChain(ppid, exe string) *Tool {
 	tool := Tool{Name: filepath.Base(exe), SHA256: checksum}
 
 	// In some cases the process has already exited, so get from map first
-	eventHandler.procMutex.Lock()
+	eventHandler.procMutex.RLock()
 	parentProcess, found := eventHandler.ProcessMap[ppid]
-	eventHandler.procMutex.Unlock()
+	eventHandler.procMutex.RUnlock()
 
 	if found {
 		tool.Parent = eventHandler.GetToolChain(parentProcess.PPid, parentProcess.Exe)

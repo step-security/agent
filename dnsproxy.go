@@ -194,7 +194,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	if proxy.GlobalBlocklist != nil {
 		if blocked, reason := proxy.GlobalBlocklist.IsDomainBlocked(domain); blocked {
-			go WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d, matched_policy: %s, reason: %s", domain, StepSecuritySinkHoleIPAddress, math.MaxInt32, GlobalBlocklistMatchedPolicy, reason))
+			go WriteLog(fmt.Sprintf("domain resolution blocked: %s, matched_policy: %s, reason: %s", domain, GlobalBlocklistMatchedPolicy, reason))
 			proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt32, Data: StepSecuritySinkHoleIPAddress}, false)
 			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress, GlobalBlocklistMatchedPolicy, reason)
 
