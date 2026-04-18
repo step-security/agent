@@ -45,11 +45,11 @@ func TestAddGlobalBlockRules(t *testing.T) {
 		t.Fatalf("AddGlobalBlockRules() error = %v", err)
 	}
 
-	if len(ipt.inserted) != 4 {
-		t.Fatalf("expected 4 inserted rules, got %d", len(ipt.inserted))
+	if len(ipt.inserted) != 6 {
+		t.Fatalf("expected 6 inserted rules, got %d", len(ipt.inserted))
 	}
 
-	expectedTargets := []string{nflogTarget, reject, nflogTarget, reject}
+	expectedTargets := []string{nflogTarget, nflogTarget, reject, nflogTarget, nflogTarget, reject}
 	for i, targetName := range expectedTargets {
 		record := ipt.inserted[i]
 		if insertedRuleTarget(record) != targetName {
