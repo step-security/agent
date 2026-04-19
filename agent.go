@@ -80,6 +80,16 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	InitGlobalFeatureFlags(config.APIURL, apiclient)
 	WriteLog("initialized global feature flags")
 	WriteLog("\n")
+
+	globalBlocklistResponse, err := apiclient.getGlobalBlocklist()
+	globalBlocklist := NewGlobalBlocklist(globalBlocklistResponse)
+	if err != nil {
+		WriteLog(fmt.Sprintf("Error initializing global blocklist: %v", err))
+	} else {
+		WriteLog(fmt.Sprintf("initialized global blocklist: %+v", globalBlocklist))
+		WriteLog("\n")
+	}
+
 	if IsArmourEnabled() {
 		lf := lockfile.New(agentLockFile)
 		if err := lf.TryLock(); err != nil {
@@ -104,7 +114,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	Cache := InitCache(config.EgressPolicy)
 
-	allowedEndpoints, wildcardEndpoints := addImplicitEndpoints(config.Endpoints, config.DisableTelemetry)
+	allowedEndpoints, wildcardEndpoints := addImplicitEndpoints(config.Endpoints, config.DisableTelemetry, globalBlocklist)
 
 	// Start DNS servers and get confirmation
 	dnsProxy := DNSProxy{
@@ -113,6 +123,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		Repo:              config.Repo,
 		ApiClient:         apiclient,
 		EgressPolicy:      config.EgressPolicy,
+		GlobalBlocklist:   globalBlocklist,
 		AllowedEndpoints:  allowedEndpoints,
 		WildCardEndpoints: wildcardEndpoints,
 		ReverseIPLookup:   make(map[string]string),
@@ -182,10 +193,11 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	if config.EgressPolicy == EgressPolicyAudit {
 		netMonitor := NetworkMonitor{
-			CorrelationId: config.CorrelationId,
-			Repo:          config.Repo,
-			ApiClient:     apiclient,
-			Status:        "Allowed",
+			CorrelationId:   config.CorrelationId,
+			Repo:            config.Repo,
+			ApiClient:       apiclient,
+			GlobalBlocklist: globalBlocklist,
+			Status:          "Allowed",
 		}
 
 		// Start network monitor
@@ -208,10 +220,11 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		WriteLog("\n")
 
 		netMonitor := NetworkMonitor{
-			CorrelationId: config.CorrelationId,
-			Repo:          config.Repo,
-			ApiClient:     apiclient,
-			Status:        "Dropped",
+			CorrelationId:   config.CorrelationId,
+			Repo:            config.Repo,
+			ApiClient:       apiclient,
+			GlobalBlocklist: globalBlocklist,
+			Status:          "Dropped",
 		}
 
 		// Start network monitor
@@ -223,7 +236,15 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			return err
 		}
 
-		go refreshDNSEntries(ctx, iptables, allowedEndpoints, &dnsProxy)
+		go refreshDNSEntries(ctx, iptables, globalBlocklist, allowedEndpoints, &dnsProxy)
+	}
+
+	if config.EgressPolicy == EgressPolicyAudit || config.EgressPolicy == EgressPolicyBlock {
+		if err := AddGlobalBlockRules(iptables, globalBlocklist); err != nil {
+			WriteLog(fmt.Sprintf("Error adding global blocklist firewall rules %v", err))
+			RevertChanges(iptables, nflog, cmd, resolvdConfigPath, dockerDaemonConfigPath, dnsConfig, sudo)
+			return err
+		}
 	}
 
 	if IsArmourEnabled() {
@@ -296,7 +317,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	}
 }
 
-func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProxy) {
+func refreshDNSEntries(ctx context.Context, iptables *Firewall, blocklist *GlobalBlocklist, allowedEndpoints map[string][]Endpoint, dnsProxy *DNSProxy) {
 	ticker := time.NewTicker(30 * time.Second)
 	go func() {
 		for {
@@ -323,7 +344,7 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 
 							for _, endpoint := range endpoints {
 								// add endpoint to firewall
-								err = InsertAllowRule(iptables, answer.Data, fmt.Sprintf("%d", endpoint.port))
+								err = InsertAllowRule(iptables, blocklist, answer.Data, fmt.Sprintf("%d", endpoint.port))
 								if err != nil {
 									break
 								}
@@ -348,7 +369,7 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, allowedEndpoints
 
 }
 
-func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool) (map[string][]Endpoint, map[string][]Endpoint) {
+func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool, blocklist *GlobalBlocklist) (map[string][]Endpoint, map[string][]Endpoint) {
 
 	normalEndpoints := make(map[string][]Endpoint)
 	wildcardEndpoints := make(map[string][]Endpoint)
@@ -387,7 +408,30 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 		normalEndpoints[stepsecurityTelemetry.domainName] = append(normalEndpoints[stepsecurityTelemetry.domainName], stepsecurityTelemetry)
 	}
 
-	return normalEndpoints, wildcardEndpoints
+	if blocklist == nil {
+		return normalEndpoints, wildcardEndpoints
+	}
+
+	filteredAllowedEndpoints := make(map[string][]Endpoint)
+	filteredWildcardEndpoints := make(map[string][]Endpoint)
+
+	for domainName, endpoints := range normalEndpoints {
+		if blocked, reason := blocklist.IsDomainBlocked(domainName); blocked {
+			WriteLog(fmt.Sprintf("removing globally blocklisted allowed endpoint %s reason: %s", domainName, reason))
+			continue
+		}
+		filteredAllowedEndpoints[domainName] = endpoints
+	}
+
+	for domainName, endpoints := range wildcardEndpoints {
+		if blocked, reason := blocklist.IsWildcardDomainBlocked(domainName); blocked {
+			WriteLog(fmt.Sprintf("removing globally blocklisted wildcard endpoint %s reason: %s", domainName, reason))
+			continue
+		}
+		filteredWildcardEndpoints[domainName] = endpoints
+	}
+
+	return filteredAllowedEndpoints, filteredWildcardEndpoints
 }
 
 func RevertChanges(iptables *Firewall, nflog AgentNflogger,

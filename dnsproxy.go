@@ -20,6 +20,7 @@ type DNSProxy struct {
 	Repo                 string
 	ApiClient            *ApiClient
 	EgressPolicy         string
+	GlobalBlocklist      *GlobalBlocklist
 	AllowedEndpoints     map[string][]Endpoint
 	WildCardEndpoints    map[string][]Endpoint
 	ReverseIPLookup      map[string]string
@@ -191,6 +192,16 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	matchesAnyWildcard := false
 	wildcardPort := ""
 
+	if proxy.GlobalBlocklist != nil {
+		if blocked, reason := proxy.GlobalBlocklist.IsDomainBlocked(domain); blocked {
+			go WriteLog(fmt.Sprintf("domain resolution blocked: %s, matched_policy: %s, reason: %s", domain, GlobalBlocklistMatchedPolicy, reason))
+			proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt32, Data: StepSecuritySinkHoleIPAddress}, false)
+			go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress, GlobalBlocklistMatchedPolicy, reason)
+
+			return StepSecuritySinkHoleIPAddress, nil
+		}
+	}
+
 	if proxy.EgressPolicy == EgressPolicyBlock {
 		if strings.HasSuffix(domain, ".internal.") {
 			go WriteLog(fmt.Sprintf("unable to resolve internal domains: %s", domain))
@@ -215,7 +226,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 				// the call will be blocked by the firewall
 				proxy.Cache.Set(domain, &Answer{Name: domain, TTL: math.MaxInt32, Data: StepSecuritySinkHoleIPAddress}, false)
 
-				go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress)
+				go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, StepSecuritySinkHoleIPAddress, "", "")
 
 				return StepSecuritySinkHoleIPAddress, nil
 			}
@@ -229,7 +240,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 	}
 
 	if matchesAnyWildcard {
-		if err := InsertAllowRule(proxy.Iptables, answer.Data, wildcardPort); err != nil {
+		if err := InsertAllowRule(proxy.Iptables, proxy.GlobalBlocklist, answer.Data, wildcardPort); err != nil {
 			WriteLog(fmt.Sprintf("Error setting firewall for wildcard domain %s:  %v", domain, err))
 		}
 	}
@@ -238,7 +249,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	go WriteLog(fmt.Sprintf("domain resolved: %s, ip address: %s, TTL: %d", domain, answer.Data, answer.TTL))
 
-	go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data)
+	go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data, "", "")
 
 	go proxy.submitDNSEvent(answer.Data)
 
