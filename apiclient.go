@@ -15,6 +15,8 @@ type DNSRecord struct {
 	DomainName        string    `json:"domainName"`
 	ResolvedIPAddress string    `json:"ipAddress"`
 	TimeStamp         time.Time `json:"timestamp"`
+	MatchedPolicy     string    `json:"matched_policy,omitempty"`
+	Reason            string    `json:"reason,omitempty"`
 }
 
 type Tool struct {
@@ -30,12 +32,14 @@ type FileEvent struct {
 }
 
 type NetworkConnection struct {
-	IPAddress  string    `json:"ipAddress,omitempty"`
-	Port       string    `json:"port,omitempty"`
-	DomainName string    `json:"domainName,omitempty"`
-	TimeStamp  time.Time `json:"timestamp"`
-	Tool       Tool      `json:"tool"`
-	Status     string    `json:"status,omitempty"`
+	IPAddress     string    `json:"ipAddress,omitempty"`
+	Port          string    `json:"port,omitempty"`
+	DomainName    string    `json:"domainName,omitempty"`
+	TimeStamp     time.Time `json:"timestamp"`
+	Tool          Tool      `json:"tool"`
+	Status        string    `json:"status,omitempty"`
+	MatchedPolicy string    `json:"matched_policy,omitempty"`
+	Reason        string    `json:"reason,omitempty"`
 }
 
 type ApiClient struct {
@@ -49,7 +53,7 @@ type ApiClient struct {
 
 const agentApiBaseUrl = "https://apiurl/v1"
 
-func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAddress string) error {
+func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAddress, matchedPolicy, reason string) error {
 
 	if !apiclient.DisableTelemetry || apiclient.EgressPolicy == EgressPolicyAudit {
 		dnsRecord := &DNSRecord{}
@@ -57,6 +61,8 @@ func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAdd
 		dnsRecord.DomainName = domainName
 		dnsRecord.ResolvedIPAddress = ipAddress
 		dnsRecord.TimeStamp = time.Now().UTC()
+		dnsRecord.MatchedPolicy = matchedPolicy
+		dnsRecord.Reason = reason
 
 		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/dns", apiclient.TelemetryURL, repo, correlationId)
 
@@ -65,7 +71,7 @@ func (apiclient *ApiClient) sendDNSRecord(correlationId, repo, domainName, ipAdd
 	return nil
 }
 
-func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, port, domainName, status string, timestamp time.Time, tool Tool) error {
+func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, port, domainName, status, matchedPolicy, reason string, timestamp time.Time, tool Tool) error {
 
 	if !apiclient.DisableTelemetry || apiclient.EgressPolicy == EgressPolicyAudit {
 		networkConnection := &NetworkConnection{}
@@ -76,6 +82,8 @@ func (apiclient *ApiClient) sendNetConnection(correlationId, repo, ipAddress, po
 		networkConnection.Status = status
 		networkConnection.TimeStamp = timestamp
 		networkConnection.Tool = tool
+		networkConnection.MatchedPolicy = matchedPolicy
+		networkConnection.Reason = reason
 
 		url := fmt.Sprintf("%s/github/%s/actions/jobs/%s/networkconnection", apiclient.TelemetryURL, repo, correlationId)
 
@@ -151,6 +159,38 @@ func (apiclient *ApiClient) getGlobalFeatureFlags() GlobalFeatureFlags {
 	}
 
 	return globalFeatureFlags
+}
+
+func (apiclient *ApiClient) getGlobalBlocklist() (*GlobalBlocklistResponse, error) {
+	url := fmt.Sprintf("%s/global-blocklist", apiclient.APIURL)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("[getGlobalBlocklist] error occurred while getting global blocklist: %s", err)
+	}
+
+	resp, err := apiclient.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("[getGlobalBlocklist] error while sending request: %s", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("[getGlobalBlocklist] response status not okay: status %d", resp.StatusCode)
+	}
+
+	reqBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("[getGlobalBlocklist] unable to read reqBody: %s", err)
+	}
+
+	out := new(GlobalBlocklistResponse)
+	err = json.Unmarshal(reqBody, out)
+	if err != nil {
+		return nil, fmt.Errorf("[getGlobalBlocklist] unable to unmarshal reqBody: %s", err)
+	}
+
+	return out, nil
 }
 
 func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{}) error {
