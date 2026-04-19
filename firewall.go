@@ -19,11 +19,14 @@ const (
 	protocol                  = "-p"
 	allProtocols              = "all"
 	tcp                       = "tcp"
+	udp                       = "udp"
 	destination               = "-d"
 	destinationPort           = "--dport"
 	target                    = "-j"
 	accept                    = "ACCEPT"
 	reject                    = "REJECT"
+	nflogTarget               = "NFLOG"
+	nflogGroup                = "100"
 	classAPrivateAddressRange = "10.0.0.0/8"
 	classBPrivateAddressRange = "172.16.0.0/12"
 	classCPrivateAddressRange = "192.168.0.0/16"
@@ -178,7 +181,11 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 	return nil
 }
 
-func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
+func InsertAllowRule(firewall *Firewall, blocklist *GlobalBlocklist, ipAddress, port string) error {
+	if blocklist != nil && blocklist.IsIPAddressBlocked(ipAddress) {
+		return nil
+	}
+
 	var ipt IPTables
 	var err error
 	if firewall == nil {
@@ -226,6 +233,83 @@ func InsertAllowRule(firewall *Firewall, ipAddress, port string) error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
 		}
+	}
+
+	return nil
+}
+
+func AddGlobalBlockRules(firewall *Firewall, blocklist *GlobalBlocklist) error {
+	if blocklist == nil {
+		return nil
+	}
+
+	if err := addGlobalBlockRulesForChain(firewall, blocklist, outputChain, defaultInterface, outbound); err != nil {
+		return errors.Wrap(err, "failed to add global block rules for default interface")
+	}
+
+	if err := addGlobalBlockRulesForChain(firewall, blocklist, dockerUserChain, dockerInterface, inbound); err != nil {
+		return errors.Wrap(err, "failed to add global block rules for docker interface")
+	}
+
+	return nil
+}
+
+func addGlobalBlockRulesForChain(firewall *Firewall, blocklist *GlobalBlocklist, chain, netInterface, direction string) error {
+	var ipt IPTables
+	var err error
+	if firewall == nil {
+		ipt, err = iptables.New()
+		if err != nil {
+			return errors.Wrap(err, "new iptables failed")
+		}
+	} else {
+		ipt = firewall.IPTables
+	}
+
+	// Add NFLOG rules once for all blocked IPs (TCP SYN + UDP)
+	tcpNflogExists, err := ipt.Exists(filterTable, chain, direction, netInterface, protocol, tcp, "--tcp-flags", "SYN,ACK", "SYN", target, nflogTarget, "--nflog-group", nflogGroup)
+	if err != nil {
+		return errors.Wrapf(err, "failed to check global block tcp nflog rule interface:%s", netInterface)
+	}
+	if !tcpNflogExists {
+		err = ipt.Insert(filterTable, chain, 1, direction, netInterface, protocol, tcp, "--tcp-flags", "SYN,ACK", "SYN", target, nflogTarget, "--nflog-group", nflogGroup)
+		if err != nil {
+			return errors.Wrapf(err, "failed to insert global block tcp nflog rule interface:%s", netInterface)
+		}
+	}
+
+	udpNflogExists, err := ipt.Exists(filterTable, chain, direction, netInterface, protocol, udp, target, nflogTarget, "--nflog-group", nflogGroup)
+	if err != nil {
+		return errors.Wrapf(err, "failed to check global block udp nflog rule interface:%s", netInterface)
+	}
+	if !udpNflogExists {
+		err = ipt.Insert(filterTable, chain, 2, direction, netInterface, protocol, udp, target, nflogTarget, "--nflog-group", nflogGroup)
+		if err != nil {
+			return errors.Wrapf(err, "failed to insert global block udp nflog rule interface:%s", netInterface)
+		}
+	}
+
+	for _, ipAddress := range blocklist.GetBlockedIPAddresses() {
+		if err := addGlobalBlockRule(ipt, chain, direction, netInterface, ipAddress); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func addGlobalBlockRule(ipt IPTables, chain, direction, netInterface, ipAddress string) error {
+	exists, err := ipt.Exists(filterTable, chain, direction, netInterface, destination, ipAddress, target, reject)
+	if err != nil {
+		return errors.Wrapf(err, "failed to check global block rule ip:%s, interface:%s", ipAddress, netInterface)
+	}
+	if exists {
+		return nil
+	}
+
+	err = ipt.Insert(filterTable, chain, 3, direction, netInterface, destination, ipAddress, target, reject)
+	if err != nil {
+		return errors.Wrapf(err, "failed to insert global block rule ip:%s, interface:%s", ipAddress, netInterface)
 	}
 
 	return nil

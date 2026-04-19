@@ -15,14 +15,15 @@ import (
 const Unknown = "Unknown"
 
 type NetworkMonitor struct {
-	CorrelationId string
-	Repo          string
-	ApiClient     *ApiClient
-	Status        string
-	netMutex      sync.RWMutex
+	CorrelationId   string
+	Repo            string
+	ApiClient       *ApiClient
+	GlobalBlocklist *GlobalBlocklist
+	Status          string
+	netMutex        sync.RWMutex
 }
 
-var ipAddresses = make(map[string]int)
+var ipAddresses = make(map[string]bool)
 
 func (netMonitor *NetworkMonitor) MonitorNetwork(ctx context.Context, nflogger AgentNflogger, errc chan error) []string {
 
@@ -92,17 +93,30 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 		ipv4, _ := ipv4Layer.(*layers.IPv4)
 		netMonitor.netMutex.Lock()
 		ipv4Address := ipv4.DstIP.String()
-		_, found := ipAddresses[ipv4Address]
+		matchedPolicy := ""
+		reason := ""
+		status := netMonitor.Status
+		if netMonitor.GlobalBlocklist != nil && netMonitor.GlobalBlocklist.IsIPAddressBlocked(ipv4Address) {
+			status = "Dropped"
+			matchedPolicy = GlobalBlocklistMatchedPolicy
+			reason = netMonitor.GlobalBlocklist.BlockedIPAddressReason(ipv4Address)
+		}
+
+		cacheKey := fmt.Sprintf("%s:%s:%s", ipv4Address, port, status)
+		_, found := ipAddresses[cacheKey]
 		if !found {
-			ipAddresses[ipv4Address] = 1
+			ipAddresses[cacheKey] = true
 
 			if isSYN || isUDP {
-				if netMonitor.Status == "Dropped" {
-
+				if status == "Dropped" {
 					netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
-						ipv4Address, port, "", netMonitor.Status, timestamp, Tool{Name: Unknown, SHA256: Unknown})
+						ipv4Address, port, "", status, matchedPolicy, reason, timestamp, Tool{Name: Unknown, SHA256: Unknown})
 
-					go WriteLog(fmt.Sprintf("ip address dropped: %s", ipv4Address))
+					logMessage := fmt.Sprintf("ip address dropped: %s", ipv4Address)
+					if reason != "" {
+						logMessage = fmt.Sprintf("%s, reason: %s", logMessage, reason)
+					}
+					go WriteLog(logMessage)
 
 					if ipv4Address != StepSecuritySinkHoleIPAddress { // Sinkhole IP address will be covered by DNS block
 						go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Traffic to IP Address %s was blocked", ipv4Address))

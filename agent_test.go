@@ -162,6 +162,9 @@ func TestRun(t *testing.T) {
 	httpmock.RegisterResponder("GET", "https://apiurl/v1/global-feature-flags?agent_type=agent-oss&version=",
 		httpmock.NewStringResponder(200, `{"agent_type":"agent-oss","enable_armour":false}`))
 
+	httpmock.RegisterResponder("GET", "https://apiurl/v1/global-blocklist",
+		httpmock.NewStringResponder(200, `{"ip_addresses":[],"domains":[],"wildcard_domains":[]}`))
+
 	tests := []struct {
 		name    string
 		args    args
@@ -239,6 +242,38 @@ func TestRun(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func Test_addImplicitEndpoints_RemovesGlobalBlocklistedEndpoints(t *testing.T) {
+	globalBlocklist := NewGlobalBlocklist(&GlobalBlocklistResponse{
+		Domains:         []CompromisedEndpoint{{Endpoint: "allowed.com", Reason: "blocked"}},
+		WildcardDomains: []CompromisedEndpoint{{Endpoint: "*.githubusercontent.com", Reason: "blocked"}},
+	})
+
+	endpoints := map[string][]Endpoint{
+		"allowed.com.":             {{domainName: "allowed.com.", port: 443}},
+		"safe.com.":                {{domainName: "safe.com.", port: 443}},
+		"*.githubusercontent.com.": {{domainName: "*.githubusercontent.com.", port: 443}},
+		"*.example.com.":           {{domainName: "*.example.com.", port: 443}},
+	}
+
+	filteredAllowedEndpoints, filteredWildcardEndpoints := addImplicitEndpoints(endpoints, true, globalBlocklist)
+
+	if _, found := filteredAllowedEndpoints["allowed.com."]; found {
+		t.Fatalf("expected allowed.com to be removed")
+	}
+
+	if _, found := filteredAllowedEndpoints["safe.com."]; !found {
+		t.Fatalf("expected safe.com to remain")
+	}
+
+	if _, found := filteredWildcardEndpoints["*.githubusercontent.com."]; found {
+		t.Fatalf("expected *.githubusercontent.com to be removed")
+	}
+
+	if _, found := filteredWildcardEndpoints["*.example.com."]; !found {
+		t.Fatalf("expected *.example.com to remain")
 	}
 }
 
