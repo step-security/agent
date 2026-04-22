@@ -164,6 +164,11 @@ func printContainerInfo(pid, ppid string) {
 
 func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 
+	// sinkhole is returned in-case of dns-block
+	if event.IPAddress == StepSecuritySinkHoleIPAddress {
+		return
+	}
+
 	if !isPrivateIPAddress(event.IPAddress) &&
 		// commenting out AzureIPAddress since it should not be called
 		// strings.Compare(event.IPAddress, AzureIPAddress) != 0 &&
@@ -191,16 +196,10 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 			} else {
 				tool = Tool{Name: image, SHA256: image} // TODO: Set container image checksum
 			}
+
 			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
-			status := ""
-			matchedPolicy := ""
-			reason := ""
-			if eventHandler.DNSProxy.GlobalBlocklist != nil && eventHandler.DNSProxy.GlobalBlocklist.IsIPAddressBlocked(event.IPAddress) {
-				status = "Dropped"
-				matchedPolicy = GlobalBlocklistMatchedPolicy
-				reason = eventHandler.DNSProxy.GlobalBlocklist.BlockedIPAddressReason(event.IPAddress)
-			}
-			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, status, matchedPolicy, reason, event.Timestamp, tool)
+			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", "", "", event.Timestamp, tool)
+
 			process := ""
 			if image == "" {
 				process = tool.Name
