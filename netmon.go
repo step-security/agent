@@ -104,11 +104,18 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 
 		cacheKey := fmt.Sprintf("%s:%s:%s", ipv4Address, port, status)
 		_, found := ipAddresses[cacheKey]
-		if !found {
-			ipAddresses[cacheKey] = true
+		if found {
+			netMonitor.netMutex.Unlock()
+			return
+		}
+		ipAddresses[cacheKey] = true
+		netMonitor.netMutex.Unlock()
 
-			if isSYN || isUDP {
-				if status == "Dropped" {
+		if isSYN || isUDP {
+			if status == "Dropped" {
+
+				if ipv4Address != StepSecuritySinkHoleIPAddress { // Sinkhole IP address will be covered by DNS block
+
 					netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
 						ipv4Address, port, "", status, matchedPolicy, reason, timestamp, Tool{Name: Unknown, SHA256: Unknown})
 
@@ -116,15 +123,13 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 					if reason != "" {
 						logMessage = fmt.Sprintf("%s, reason: %s", logMessage, reason)
 					}
+
 					go WriteLog(logMessage)
 
-					if ipv4Address != StepSecuritySinkHoleIPAddress { // Sinkhole IP address will be covered by DNS block
-						go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Traffic to IP Address %s was blocked", ipv4Address))
-					}
+					go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Traffic to IP Address %s was blocked", ipv4Address))
 				}
 			}
 		}
-		netMonitor.netMutex.Unlock()
 	}
 
 }
