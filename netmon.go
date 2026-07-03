@@ -109,16 +109,19 @@ func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
 
 			if isSYN || isUDP {
 				if status == "Dropped" {
-					netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
-						ipv4Address, port, "", status, matchedPolicy, reason, timestamp, Tool{Name: Unknown, SHA256: Unknown})
-
-					logMessage := fmt.Sprintf("ip address dropped: %s", ipv4Address)
-					if reason != "" {
-						logMessage = fmt.Sprintf("%s, reason: %s", logMessage, reason)
-					}
-					go WriteLog(logMessage)
 
 					if ipv4Address != StepSecuritySinkHoleIPAddress { // Sinkhole IP address will be covered by DNS block
+
+						netMonitor.ApiClient.sendNetConnection(netMonitor.CorrelationId, netMonitor.Repo,
+							ipv4Address, port, "", status, matchedPolicy, reason, timestamp, Tool{Name: Unknown, SHA256: Unknown})
+
+						logMessage := fmt.Sprintf("ip address dropped: %s", ipv4Address)
+						if reason != "" {
+							logMessage = fmt.Sprintf("%s, reason: %s", logMessage, reason)
+						}
+
+						go WriteLog(logMessage)
+
 						go WriteAnnotation(fmt.Sprintf("StepSecurity Harden Runner: Traffic to IP Address %s was blocked", ipv4Address))
 					}
 				}
