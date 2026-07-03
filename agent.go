@@ -80,6 +80,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	InitGlobalFeatureFlags(config.APIURL, apiclient)
 	WriteLog("initialized global feature flags")
 	WriteLog("\n")
+	globalFlags := GetGlobalFeatureFlags()
 
 	globalBlocklistResponse, err := apiclient.getGlobalBlocklist()
 	globalBlocklist := NewGlobalBlocklist(globalBlocklistResponse)
@@ -253,6 +254,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			Pids:             getPidsOfInterest(),
 			Files:            []string{},
 			EnforceReadBlock: false,
+			EnforceKillBlock: !globalFlags.DisableKillEnforcement,
 			ApiConf: &armour.ApiConf{
 				APIURL:           config.APIURL,
 				Repo:             config.Repo,

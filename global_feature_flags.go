@@ -14,6 +14,7 @@ type GlobalFeatureFlags struct {
 	AgentType                  string `json:"agent_type"`
 	EnableArmour               bool   `json:"enable_armour"`
 	EnableCustomDetectionRules bool   `json:"enable_custom_detection_rules"`
+	DisableKillEnforcement     bool   `json:"disable_kill_enforcement,omitempty"`
 }
 
 // GlobalFeatureFlagManager manages fetching and caching of global feature flags.
