@@ -254,12 +254,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			Pids:             getPidsOfInterest(),
 			Files:            []string{},
 			EnforceReadBlock: false,
-			EnforceKillBlock: func() bool {
-				if globalFlags.DisableKillEnforcement {
-					return false
-				}
-				return true
-			}(),
+			EnforceKillBlock: !globalFlags.DisableKillEnforcement,
 			ApiConf: &armour.ApiConf{
 				APIURL:           config.APIURL,
 				Repo:             config.Repo,
