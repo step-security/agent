@@ -26,6 +26,7 @@ type NetworkMonitor struct {
 var ipAddresses = make(map[string]bool)
 
 func (netMonitor *NetworkMonitor) MonitorNetwork(ctx context.Context, nflogger AgentNflogger, errc chan error) []string {
+	defer panicHandler()
 
 	//sysLogger, err := syslog.NewLogger(syslog.LOG_INFO|syslog.LOG_USER, 1)
 	var err error
@@ -67,6 +68,8 @@ func (netMonitor *NetworkMonitor) MonitorNetwork(ctx context.Context, nflogger A
 }
 
 func (netMonitor *NetworkMonitor) handlePacket(attrs nflog.Attribute) {
+	defer panicHandler()
+
 	timestamp := time.Now().UTC() // *attrs.Timestamp
 	data := *attrs.Payload
 	packet := gopacket.NewPacket(data, layers.LayerTypeIPv4, gopacket.Default)

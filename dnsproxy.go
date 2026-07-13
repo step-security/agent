@@ -328,6 +328,8 @@ func (proxy *DNSProxy) submitDNSEvent(dest string) {
 }
 
 func startDNSServer(dnsProxy *DNSProxy, server DNSServer, errc chan error) {
+	defer panicHandler()
+
 	dns.HandleFunc(".", func(w dns.ResponseWriter, r *dns.Msg) {
 		switch r.Opcode {
 		case dns.OpcodeQuery:
