@@ -137,7 +137,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	// start proc mon
 	if cmd == nil {
 		procMon := &ProcessMonitor{CorrelationId: config.CorrelationId, Repo: config.Repo,
-			ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory, DisableFileMonitoring: config.DisableFileMonitoring, DNSProxy: &dnsProxy}
+			ApiClient: apiclient, WorkingDirectory: config.WorkingDirectory, DisableFileMonitoring: config.DisableFileMonitoring, ExemptFiles: config.ExemptFiles, DNSProxy: &dnsProxy}
 		go procMon.MonitorProcesses(errc)
 		WriteLog("started process monitor")
 	}
