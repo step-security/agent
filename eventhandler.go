@@ -198,13 +198,23 @@ func (eventHandler *EventHandler) handleNetworkEvent(event *Event) {
 			}
 
 			reverseLookUp := eventHandler.DNSProxy.GetReverseIPLookup(event.IPAddress)
-			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, "", "", "", event.Timestamp, tool)
+
+			status := ""
+			matchedPolicy := ""
+			reason := ""
+			if eventHandler.DNSProxy.GlobalBlocklist != nil && eventHandler.DNSProxy.GlobalBlocklist.IsIPAddressBlocked(event.IPAddress) {
+				status = "Dropped"
+				matchedPolicy = GlobalBlocklistMatchedPolicy
+				reason = eventHandler.DNSProxy.GlobalBlocklist.BlockedIPAddressReason(event.IPAddress)
+			}
+
+			eventHandler.ApiClient.sendNetConnection(eventHandler.CorrelationId, eventHandler.Repo, event.IPAddress, event.Port, reverseLookUp, status, matchedPolicy, reason, event.Timestamp, tool)
 
 			process := ""
 			if image == "" {
 				process = tool.Name
 			}
-			WriteLog(fmt.Sprintf("endpoint called ip address:port %s:%s, domain: %s, pid: %s, process: %s", event.IPAddress, event.Port, reverseLookUp, event.Pid, process))
+			WriteLog(fmt.Sprintf("endpoint called ip address:port %s:%s, domain: %s, pid: %s, process: %s, status: %s", event.IPAddress, event.Port, reverseLookUp, event.Pid, process, status))
 		}
 	}
 
