@@ -13,10 +13,17 @@ type Sudo struct {
 	SudoersBackUpPath string
 }
 
-const (
-	sudoersFile = "/etc/sudoers.d/runner"
-	runnerUser  = "runner"
-)
+// sudoersFile is a var so tests can point it at a temp file
+var sudoersFile = "/etc/sudoers.d/runner"
+
+const runnerUser = "runner"
+
+// runCmd is a var so tests can inject a fake command runner
+var runCmd = run
+
+// socket paths are vars so tests can point them at temp files
+var dockerSockPath = "/var/run/docker.sock"
+var containerdSockPath = "/run/containerd/containerd.sock"
 
 func (s *Sudo) disableSudo(tempDir string) error {
 	s.SudoersBackUpPath = path.Join(tempDir, "runner")
@@ -47,17 +54,27 @@ func (s *Sudo) revertDisableSudo() error {
 
 func (s *Sudo) disableSudoAndContainers(tempDir string) error {
 
-	s.removeDockerDirectoriesAndFiles()
-
-	// Remove socket permissions if they exist
-	s.removeSocketPermissions()
 	var errstrings []string
 
+	// Revoke sudo first: a single truncate syscall. This must happen before
+	// any container teardown — the teardown takes several seconds and job
+	// steps can start (and run `sudo`) while it is still in progress.
 	err := s.disableSudo(tempDir)
 	if err != nil {
 		WriteLog(fmt.Sprintf("error disabling sudo: %v", err))
 		errstrings = append(errstrings, err.Error())
 	}
+
+	// Revoke container access second: chmod on the sockets, also instant.
+	s.removeSocketPermissions()
+
+	// Slow cleanup runs in the background — it is not enforcement and must
+	// not delay it. Purge first (stops the daemon, unmounts overlays), then
+	// delete the directories; racing the two makes the delete far slower.
+	go func() {
+		s.uninstallDocker()
+		s.removeDockerDirectoriesAndFiles()
+	}()
 
 	//flatten errs
 	if len(errstrings) > 0 {
@@ -69,19 +86,15 @@ func (s *Sudo) disableSudoAndContainers(tempDir string) error {
 // removeSocketPermissions removes permissions from Docker and containerd sockets if they exist
 func (s *Sudo) removeSocketPermissions() {
 	// Check and remove docker.sock permissions if it exists
-	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
-		cmd := exec.Command("sudo", "chmod", "000", "/var/run/docker.sock")
-		err := cmd.Run()
-		if err != nil {
+	if _, err := os.Stat(dockerSockPath); err == nil {
+		if err := os.Chmod(dockerSockPath, 0000); err != nil {
 			WriteLog(fmt.Sprintf("error removing docker.sock permissions: %v", err))
 		}
 	}
 
 	// Check and remove containerd.sock permissions if it exists
-	if _, err := os.Stat("/run/containerd/containerd.sock"); err == nil {
-		cmd := exec.Command("sudo", "chmod", "000", "/run/containerd/containerd.sock")
-		err := cmd.Run()
-		if err != nil {
+	if _, err := os.Stat(containerdSockPath); err == nil {
+		if err := os.Chmod(containerdSockPath, 0000); err != nil {
 			WriteLog(fmt.Sprintf("error removing containerd.sock permissions: %v", err))
 		}
 	}
@@ -120,15 +133,15 @@ func run(cmd string, args ...string) {
 
 func (s *Sudo) uninstallDocker() error {
 	WriteLog("Uninstalling docker")
-	run("sudo", "apt-get", "purge", "-y",
+	runCmd("apt-get", "purge", "-y",
 		"docker-ce", "docker-ce-cli", "containerd.io")
 	return nil
 }
 
 func (s *Sudo) removeDockerDirectoriesAndFiles() error {
-	run("sudo", "rm", "-rf", "/var/lib/docker")
-	run("sudo", "rm", "-rf", "/var/lib/containerd")
-	run("sudo", "rm", "-f", "/etc/apt/sources.list.d/docker.list")
-	run("sudo", "rm", "-f", "/etc/apt/keyrings/docker.asc")
+	runCmd("rm", "-rf", "/var/lib/docker")
+	runCmd("rm", "-rf", "/var/lib/containerd")
+	runCmd("rm", "-f", "/etc/apt/sources.list.d/docker.list")
+	runCmd("rm", "-f", "/etc/apt/keyrings/docker.asc")
 	return nil
 }
