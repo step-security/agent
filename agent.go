@@ -130,7 +130,17 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 
 	Cache := InitCache(config.EgressPolicy)
 
-	allowedEndpoints, wildcardEndpoints := addImplicitEndpoints(config.Endpoints, config.DisableTelemetry, globalBlocklist)
+	// Fetch GitHub Actions domains from the meta API. On failure the
+	// hardcoded implicit endpoints remain the baseline.
+	githubMetaDomains, err := apiclient.getGithubMetaDomains()
+	if err != nil {
+		WriteLog(fmt.Sprintf("Error fetching GitHub meta domains: %v", err))
+	} else {
+		WriteLog(fmt.Sprintf("fetched GitHub meta domains: %+v", githubMetaDomains))
+		WriteLog("\n")
+	}
+
+	allowedEndpoints, wildcardEndpoints := addImplicitEndpoints(config.Endpoints, config.DisableTelemetry, globalBlocklist, githubMetaDomains)
 
 	// Start DNS servers and get confirmation
 	dnsProxy := DNSProxy{
@@ -372,7 +382,7 @@ func refreshDNSEntries(ctx context.Context, iptables *Firewall, blocklist *Globa
 
 }
 
-func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool, blocklist *GlobalBlocklist) (map[string][]Endpoint, map[string][]Endpoint) {
+func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool, blocklist *GlobalBlocklist, githubMetaDomains []Endpoint) (map[string][]Endpoint, map[string][]Endpoint) {
 
 	normalEndpoints := make(map[string][]Endpoint)
 	wildcardEndpoints := make(map[string][]Endpoint)
@@ -384,6 +394,10 @@ func addImplicitEndpoints(endpoints map[string][]Endpoint, disableTelemetry bool
 		{domainName: "actions-results-receiver-production.githubapp.com", port: 443}, // GitHub
 		{domainName: "productionresultssa*.blob.core.windows.net.", port: 443},       // GitHub
 	}
+
+	// GitHub Actions domains fetched from the meta API; empty if the fetch
+	// failed, in which case the hardcoded list above is the baseline.
+	implicitEndpoints = append(implicitEndpoints, githubMetaDomains...)
 
 	for key, val := range endpoints {
 		if isWildcardDomain(key) {
