@@ -11,34 +11,29 @@ import (
 
 const testSudoersContent = "runner ALL=(ALL) NOPASSWD:ALL\n"
 
-func setupFakeSudoers(t *testing.T) string {
+// newTestSudo returns a Sudo wired to a fake sudoers file and non-existent
+// socket paths so tests never touch the machine's real sudoers or sockets.
+// All seams are per-instance fields: the background container-cleanup
+// goroutine may outlive the test, so it must never read package-level state
+// that a test cleanup restores.
+func newTestSudo(t *testing.T, runCmd func(cmd string, args ...string)) (*Sudo, string) {
 	t.Helper()
-	origSudoers := sudoersFile
-	sudoersFile = path.Join(t.TempDir(), "runner")
-	t.Cleanup(func() { sudoersFile = origSudoers })
-
-	redirectSocketPaths(t)
+	dir := t.TempDir()
+	sudoersPath := path.Join(dir, "runner")
 	// 0640 rather than the real file's 0440: the agent truncates as root
 	// (which bypasses permission checks), but tests run unprivileged.
-	if err := os.WriteFile(sudoersFile, []byte(testSudoersContent), 0640); err != nil {
+	if err := os.WriteFile(sudoersPath, []byte(testSudoersContent), 0640); err != nil {
 		t.Fatalf("failed to create fake sudoers file: %v", err)
 	}
-	return sudoersFile
-}
-
-// redirectSocketPaths points socket paths at non-existent temp files so tests
-// never chmod the machine's real docker/containerd sockets.
-func redirectSocketPaths(t *testing.T) {
-	t.Helper()
-	origDocker, origContainerd := dockerSockPath, containerdSockPath
-	dockerSockPath = path.Join(t.TempDir(), "no-such-docker.sock")
-	containerdSockPath = path.Join(t.TempDir(), "no-such-containerd.sock")
-	t.Cleanup(func() { dockerSockPath, containerdSockPath = origDocker, origContainerd })
+	return &Sudo{
+		sudoersFilePathOverride: sudoersPath,
+		dockerSockPathOverride:  path.Join(dir, "no-such-docker.sock"),
+		containerdSockOverride:  path.Join(dir, "no-such-containerd.sock"),
+		runCmd:                  runCmd,
+	}, sudoersPath
 }
 
 func Test_disableSudoAndContainers_RevokesSudoBeforeContainerCleanup(t *testing.T) {
-	setupFakeSudoers(t)
-
 	type observed struct {
 		command     string
 		sudoersSize int64
@@ -49,11 +44,11 @@ func Test_disableSudoAndContainers_RevokesSudoBeforeContainerCleanup(t *testing.
 	var mu sync.Mutex
 	var commands []string
 
-	origRun := runCmd
-	runCmd = func(cmd string, args ...string) {
+	sudo, sudoersPath := newTestSudo(t, nil)
+	sudo.runCmd = func(cmd string, args ...string) {
 		full := strings.Join(append([]string{cmd}, args...), " ")
 		var size int64 = -1
-		if fi, err := os.Stat(sudoersFile); err == nil {
+		if fi, err := os.Stat(sudoersPath); err == nil {
 			size = fi.Size()
 		}
 		mu.Lock()
@@ -65,12 +60,8 @@ func Test_disableSudoAndContainers_RevokesSudoBeforeContainerCleanup(t *testing.
 		}
 		<-release
 	}
-	t.Cleanup(func() {
-		close(release)
-		runCmd = origRun
-	})
+	t.Cleanup(func() { close(release) })
 
-	sudo := &Sudo{}
 	done := make(chan error, 1)
 	go func() {
 		done <- sudo.disableSudoAndContainers(t.TempDir())
@@ -87,7 +78,7 @@ func Test_disableSudoAndContainers_RevokesSudoBeforeContainerCleanup(t *testing.
 		t.Fatal("disableSudoAndContainers blocked on container teardown; sudo revocation must complete first")
 	}
 
-	fi, err := os.Stat(sudoersFile)
+	fi, err := os.Stat(sudoersPath)
 	if err != nil {
 		t.Fatalf("failed to stat sudoers file: %v", err)
 	}
@@ -112,16 +103,14 @@ func Test_disableSudoAndContainers_RevokesSudoBeforeContainerCleanup(t *testing.
 }
 
 func Test_disableSudoAndContainers_ErrorSurfacesWhenSudoersMissing(t *testing.T) {
-	origSudoers := sudoersFile
-	sudoersFile = path.Join(t.TempDir(), "does-not-exist")
-	t.Cleanup(func() { sudoersFile = origSudoers })
-	redirectSocketPaths(t)
+	dir := t.TempDir()
+	sudo := &Sudo{
+		sudoersFilePathOverride: path.Join(dir, "does-not-exist"),
+		dockerSockPathOverride:  path.Join(dir, "no-such-docker.sock"),
+		containerdSockOverride:  path.Join(dir, "no-such-containerd.sock"),
+		runCmd:                  func(cmd string, args ...string) {},
+	}
 
-	origRun := runCmd
-	runCmd = func(cmd string, args ...string) {}
-	t.Cleanup(func() { runCmd = origRun })
-
-	sudo := &Sudo{}
 	err := sudo.disableSudoAndContainers(t.TempDir())
 	if err == nil {
 		t.Fatal("expected error when sudoers backup fails, got nil")
@@ -133,30 +122,23 @@ func Test_disableSudoAndContainers_ErrorSurfacesWhenSudoersMissing(t *testing.T)
 
 // Socket permissions must be revoked synchronously (before return), via chmod.
 func Test_disableSudoAndContainers_RemovesSocketPermissions(t *testing.T) {
-	setupFakeSudoers(t)
+	sudo, _ := newTestSudo(t, func(cmd string, args ...string) {})
 
 	sockDir := t.TempDir()
-	origDocker, origContainerd := dockerSockPath, containerdSockPath
-	dockerSockPath = path.Join(sockDir, "docker.sock")
-	containerdSockPath = path.Join(sockDir, "containerd.sock")
-	t.Cleanup(func() { dockerSockPath, containerdSockPath = origDocker, origContainerd })
+	sudo.dockerSockPathOverride = path.Join(sockDir, "docker.sock")
+	sudo.containerdSockOverride = path.Join(sockDir, "containerd.sock")
 
-	for _, p := range []string{dockerSockPath, containerdSockPath} {
+	for _, p := range []string{sudo.dockerSockPathOverride, sudo.containerdSockOverride} {
 		if err := os.WriteFile(p, nil, 0660); err != nil {
 			t.Fatalf("failed to create fake socket %s: %v", p, err)
 		}
 	}
 
-	origRun := runCmd
-	runCmd = func(cmd string, args ...string) {}
-	t.Cleanup(func() { runCmd = origRun })
-
-	sudo := &Sudo{}
 	if err := sudo.disableSudoAndContainers(t.TempDir()); err != nil {
 		t.Fatalf("disableSudoAndContainers returned error: %v", err)
 	}
 
-	for _, p := range []string{dockerSockPath, containerdSockPath} {
+	for _, p := range []string{sudo.dockerSockPathOverride, sudo.containerdSockOverride} {
 		fi, err := os.Stat(p)
 		if err != nil {
 			t.Fatalf("failed to stat %s: %v", p, err)
@@ -168,9 +150,8 @@ func Test_disableSudoAndContainers_RemovesSocketPermissions(t *testing.T) {
 }
 
 func Test_disableSudo_BackupAndRevert(t *testing.T) {
-	setupFakeSudoers(t)
+	sudo, sudoersPath := newTestSudo(t, func(cmd string, args ...string) {})
 
-	sudo := &Sudo{}
 	tempDir := t.TempDir()
 	if err := sudo.disableSudo(tempDir); err != nil {
 		t.Fatalf("disableSudo returned error: %v", err)
@@ -184,7 +165,7 @@ func Test_disableSudo_BackupAndRevert(t *testing.T) {
 		t.Fatalf("backup content = %q, want %q", string(backup), testSudoersContent)
 	}
 
-	fi, err := os.Stat(sudoersFile)
+	fi, err := os.Stat(sudoersPath)
 	if err != nil {
 		t.Fatalf("failed to stat sudoers file: %v", err)
 	}
@@ -195,7 +176,7 @@ func Test_disableSudo_BackupAndRevert(t *testing.T) {
 	if err := sudo.revertDisableSudo(); err != nil {
 		t.Fatalf("revertDisableSudo returned error: %v", err)
 	}
-	restored, err := os.ReadFile(sudoersFile)
+	restored, err := os.ReadFile(sudoersPath)
 	if err != nil {
 		t.Fatalf("failed to read restored sudoers file: %v", err)
 	}
