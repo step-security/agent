@@ -21,7 +21,7 @@ func Test_getGithubMetaDomains(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		fmt.Fprint(w, `{"domains":{"actions":["github.com","api.github.com","codeload.github.com","*.actions.githubusercontent.com","objects.githubusercontent.com"]}}`)
+		fmt.Fprint(w, `{"domains":{"actions":["github.com","api.github.com","codeload.github.com","*.github.com","*.actions.githubusercontent.com","objects.githubusercontent.com"]}}`)
 	}))
 	defer server.Close()
 
@@ -32,17 +32,21 @@ func Test_getGithubMetaDomains(t *testing.T) {
 		t.Fatalf("getGithubMetaDomains returned error: %v", err)
 	}
 
+	// Domains must come back in Fqdn form (trailing dot): wildcard matching
+	// in the DNS proxy compares raw suffixes against Fqdn query names, so a
+	// dotless wildcard like "*.github.com" would never match.
 	want := map[string]bool{
-		"github.com":          false,
-		"api.github.com":      false,
-		"codeload.github.com": false,
+		"github.com.":          false,
+		"api.github.com.":      false,
+		"codeload.github.com.": false,
+		"*.github.com.":        false,
 	}
 	for _, e := range endpoints {
 		if e.port != 443 {
 			t.Fatalf("endpoint %s port = %d, want 443", e.domainName, e.port)
 		}
 		if _, ok := want[e.domainName]; !ok {
-			t.Fatalf("unexpected endpoint %q; githubusercontent.com domains must be filtered out", e.domainName)
+			t.Fatalf("unexpected endpoint %q; want Fqdn form, githubusercontent.com domains filtered out", e.domainName)
 		}
 		want[e.domainName] = true
 	}
@@ -70,8 +74,8 @@ func Test_getGithubMetaDomains_RetriesOnFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getGithubMetaDomains returned error: %v", err)
 	}
-	if len(endpoints) != 1 || endpoints[0].domainName != "github.com" {
-		t.Fatalf("endpoints = %+v, want [github.com]", endpoints)
+	if len(endpoints) != 1 || endpoints[0].domainName != "github.com." {
+		t.Fatalf("endpoints = %+v, want [github.com.]", endpoints)
 	}
 	if got := calls.Load(); got != 3 {
 		t.Fatalf("server called %d times, want 3", got)
