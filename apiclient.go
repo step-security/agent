@@ -10,6 +10,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 type DNSRecord struct {
@@ -244,7 +246,9 @@ func (apiclient *ApiClient) getGithubMetaDomains() ([]Endpoint, error) {
 			if strings.HasSuffix(domain, "githubusercontent.com") {
 				continue
 			}
-			endpoints = append(endpoints, Endpoint{domainName: domain, port: 443})
+			// Fqdn form (trailing dot) is required for wildcard matching:
+			// matchWildcardDomain compares raw suffixes against Fqdn queries.
+			endpoints = append(endpoints, Endpoint{domainName: dns.Fqdn(domain), port: 443})
 		}
 
 		return endpoints, nil
