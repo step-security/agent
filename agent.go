@@ -113,6 +113,21 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 		}
 	}
 
+	sudo := Sudo{}
+
+	// Revoke sudo and container access as early as possible — only the parsed
+	// config and temp dir are prerequisites. Container teardown runs in the
+	// background inside disableSudoAndContainers; job steps must not get a
+	// window to run `sudo` while DNS/firewall setup is still in progress.
+	if config.DisableSudoAndContainers {
+		err := sudo.disableSudoAndContainers(tempDir)
+		if err != nil {
+			WriteLog(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
+		} else {
+			WriteLog("disabled sudo and docker")
+		}
+	}
+
 	Cache := InitCache(config.EgressPolicy)
 
 	// Fetch GitHub Actions domains from the meta API. On failure the
@@ -153,12 +168,7 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	}
 
 	dnsConfig := DnsConfig{}
-	sudo := Sudo{}
 	var ipAddressEndpoints []ipAddressEndpoint
-
-	if config.DisableSudoAndContainers {
-		go sudo.uninstallDocker()
-	}
 
 	// hydrate dns cache
 	if config.EgressPolicy == EgressPolicyBlock {
@@ -290,15 +300,6 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 			if IsCustomDetectionRulesEnabled() {
 				WriteLog("[armour] Custom detection rules enabled")
 			}
-		}
-	}
-
-	if config.DisableSudoAndContainers {
-		err := sudo.disableSudoAndContainers(tempDir)
-		if err != nil {
-			WriteLog(fmt.Sprintf("%s Unable to disable sudo and docker %v", StepSecurityAnnotationPrefix, err))
-		} else {
-			WriteLog("disabled sudo and docker")
 		}
 	}
 
