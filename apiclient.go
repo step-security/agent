@@ -8,7 +8,10 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 type DNSRecord struct {
@@ -191,6 +194,67 @@ func (apiclient *ApiClient) getGlobalBlocklist() (*GlobalBlocklistResponse, erro
 	}
 
 	return out, nil
+}
+
+type GithubMetaResponse struct {
+	Domains struct {
+		Actions []string `json:"actions"`
+	} `json:"domains"`
+}
+
+// getGithubMetaDomains fetches the GitHub Actions domains from the meta API.
+// Domains under githubusercontent.com are skipped since they are already
+// covered by the hardcoded wildcard implicit endpoints.
+func (apiclient *ApiClient) getGithubMetaDomains() ([]Endpoint, error) {
+	url := fmt.Sprintf("%s/github/meta", apiclient.APIURL)
+
+	maxRetries := 3
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		resp, err := apiclient.Client.Get(url)
+		if err != nil {
+			lastErr = fmt.Errorf("[getGithubMetaDomains] error while sending request: %s", err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("[getGithubMetaDomains] response status not okay: status %d", resp.StatusCode)
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("[getGithubMetaDomains] unable to read response body: %s", err)
+			continue
+		}
+
+		var meta GithubMetaResponse
+		if err := json.Unmarshal(body, &meta); err != nil {
+			lastErr = fmt.Errorf("[getGithubMetaDomains] unable to unmarshal response body: %s", err)
+			continue
+		}
+
+		var endpoints []Endpoint
+		for _, domain := range meta.Domains.Actions {
+			if strings.HasSuffix(domain, "githubusercontent.com") {
+				continue
+			}
+			// Fqdn form (trailing dot) is required for wildcard matching:
+			// matchWildcardDomain compares raw suffixes against Fqdn queries.
+			endpoints = append(endpoints, Endpoint{domainName: dns.Fqdn(domain), port: 443})
+		}
+
+		return endpoints, nil
+	}
+
+	return nil, fmt.Errorf("failed to fetch GitHub meta domains after %d retries: %v", maxRetries, lastErr)
 }
 
 func (apiclient *ApiClient) sendApiRequest(method, url string, body interface{}) error {
