@@ -24,6 +24,7 @@ type config struct {
 	DisableSudo              bool
 	DisableSudoAndContainers bool
 	DisableFileMonitoring    bool
+	ExemptFiles              []string
 	Private                  bool
 }
 
@@ -46,6 +47,7 @@ type configFile struct {
 	DisableSudo              bool   `json:"disable_sudo"`
 	DisableSudoAndContainers bool   `json:"disable_sudo_and_containers"`
 	DisableFileMonitoring    bool   `json:"disable_file_monitoring"`
+	ExemptFiles              string `json:"exempt_files"`
 	Private                  bool   `json:"private"`
 }
 
@@ -77,9 +79,23 @@ func (c *config) init(configFilePath string) error {
 	c.DisableSudo = configFile.DisableSudo
 	c.DisableSudoAndContainers = configFile.DisableSudoAndContainers
 	c.DisableFileMonitoring = configFile.DisableFileMonitoring
+	c.ExemptFiles = parseExemptFiles(configFile.ExemptFiles)
 	c.Private = configFile.Private
 	c.OneTimeKey = configFile.OneTimeKey
 	return nil
+}
+
+// parseExemptFiles splits the exempt_files config value into individual paths.
+// It splits on newlines only so that paths containing spaces are preserved.
+func parseExemptFiles(exemptFiles string) []string {
+	var files []string
+	for _, line := range strings.Split(exemptFiles, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) > 0 {
+			files = append(files, trimmed)
+		}
+	}
+	return files
 }
 
 func parseEndpoints(allowedEndpoints string) map[string][]Endpoint {

@@ -20,6 +20,7 @@ type ProcessMonitor struct {
 	DNSProxy              *DNSProxy
 	WorkingDirectory      string
 	DisableFileMonitoring bool
+	ExemptFiles           []string
 	Events                map[int]*Event
 	mutex                 sync.RWMutex
 }

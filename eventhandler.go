@@ -28,6 +28,7 @@ type EventHandler struct {
 	ProcessMap              map[string]*Process
 	SourceCodeMap           map[string][]*Event
 	FileOverwriteCounterMap map[string]int // to count file overwrites by an exe
+	ExemptFiles             []string       // files exempted from overwrite detection
 	netMutex                sync.RWMutex
 	fileMutex               sync.RWMutex
 	procMutex               sync.RWMutex
@@ -60,7 +61,7 @@ func (eventHandler *EventHandler) handleFileEvent(event *Event) {
 	// Uncomment to log file writes (only uncomment in INT env)
 	// WriteLog(fmt.Sprintf("file write %s, syscall %s", event.FileName, event.Syscall))
 
-	if isSourceCodeFile(event.FileName) {
+	if isSourceCodeFile(event.FileName) && !eventHandler.isExemptFile(event.FileName) {
 		eventHandler.fileMutex.Lock()
 		defer eventHandler.fileMutex.Unlock()
 
@@ -98,6 +99,19 @@ func isSourceCodeFile(fileName string) bool {
 	// If it has an extension or might be a Dockerfile
 	if strings.Contains(fileName, ".") || strings.Contains(fileName, "Dockerfile") {
 		return true
+	}
+
+	return false
+}
+
+// isExemptFile returns true when the file matches one of the configured exempt
+// paths. Exempt entries are usually repo-relative while events carry absolute
+// paths, so we match on the full path or a trailing path segment.
+func (eventHandler *EventHandler) isExemptFile(fileName string) bool {
+	for _, exempt := range eventHandler.ExemptFiles {
+		if fileName == exempt || strings.HasSuffix(fileName, "/"+exempt) {
+			return true
+		}
 	}
 
 	return false
