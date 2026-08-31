@@ -100,12 +100,15 @@ func addBlockRules(firewall *Firewall, endpoints []ipAddressEndpoint, chain, net
 	}
 
 	for _, endpoint := range endpoints {
-		err = ipt.Append(filterTable, chain, direction, netInterface, protocol, tcp,
-			destination, endpoint.ipAddress,
-			destinationPort, endpoint.port, target, accept)
+		// Allow both TCP and UDP so protocols like QUIC (HTTP/3) work for allowed endpoints.
+		for _, ipProtocol := range []string{tcp, udp} {
+			err = ipt.Append(filterTable, chain, direction, netInterface, protocol, ipProtocol,
+				destination, endpoint.ipAddress,
+				destinationPort, endpoint.port, target, accept)
 
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to append endpoint rule ip:%s, port:%s", endpoint.ipAddress, endpoint.port))
+			if err != nil {
+				return errors.Wrap(err, fmt.Sprintf("failed to append endpoint rule ip:%s, port:%s, protocol:%s", endpoint.ipAddress, endpoint.port, ipProtocol))
+			}
 		}
 	}
 
@@ -199,39 +202,35 @@ func InsertAllowRule(firewall *Firewall, blocklist *GlobalBlocklist, ipAddress, 
 		ipt = firewall.IPTables
 	}
 
-	exists, err := ipt.Exists(filterTable, outputChain, outbound, defaultInterface, protocol, tcp,
-		destination, ipAddress,
-		destinationPort, port, target, accept)
-
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to check if endpoint exists ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
-	}
-
-	if !exists {
-		err = ipt.Insert(filterTable, outputChain, 1, outbound, defaultInterface, protocol, tcp,
-			destination, ipAddress,
-			destinationPort, port, target, accept)
-
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
+	// Allow both TCP and UDP so protocols like QUIC (HTTP/3) work for allowed endpoints.
+	for _, ipProtocol := range []string{tcp, udp} {
+		if err := insertAllowRuleForProtocol(ipt, outputChain, outbound, defaultInterface, ipProtocol, ipAddress, port); err != nil {
+			return err
+		}
+		if err := insertAllowRuleForProtocol(ipt, dockerUserChain, inbound, dockerInterface, ipProtocol, ipAddress, port); err != nil {
+			return err
 		}
 	}
 
-	exists, err = ipt.Exists(filterTable, dockerUserChain, inbound, dockerInterface, protocol, tcp,
+	return nil
+}
+
+func insertAllowRuleForProtocol(ipt IPTables, chain, direction, netInterface, ipProtocol, ipAddress, port string) error {
+	exists, err := ipt.Exists(filterTable, chain, direction, netInterface, protocol, ipProtocol,
 		destination, ipAddress,
 		destinationPort, port, target, accept)
 
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to check if endpoint exists ip:%s, port:%s, interface:%s", ipAddress, port, dockerInterface))
+		return errors.Wrap(err, fmt.Sprintf("failed to check if endpoint exists ip:%s, port:%s, protocol:%s, interface:%s", ipAddress, port, ipProtocol, netInterface))
 	}
 
 	if !exists {
-		err = ipt.Insert(filterTable, dockerUserChain, 1, inbound, dockerInterface, protocol, tcp,
+		err = ipt.Insert(filterTable, chain, 1, direction, netInterface, protocol, ipProtocol,
 			destination, ipAddress,
 			destinationPort, port, target, accept)
 
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, interface:%s", ipAddress, port, defaultInterface))
+			return errors.Wrap(err, fmt.Sprintf("failed to insert endpoint rule ip:%s, port:%s, protocol:%s, interface:%s", ipAddress, port, ipProtocol, netInterface))
 		}
 	}
 
