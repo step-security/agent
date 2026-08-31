@@ -41,11 +41,11 @@ func Test_updateDockerConfig(t *testing.T) {
 	}{
 		{name: "existing file",
 			args:    args{configPath: tmpFileName},
-			want:    "{\"cgroup-parent\":\"/actions_job\",\"dns\":[\"172.17.0.1\"],\"live-restore\":true}",
+			want:    "{\"cgroup-parent\":\"/actions_job\",\"live-restore\":true}",
 			wantErr: false},
 		{name: "non existent file",
 			args:    args{configPath: mockDockerConfigPath},
-			want:    "{\"dns\":[\"172.17.0.1\"],\"live-restore\":true}",
+			want:    "{\"live-restore\":true}",
 			wantErr: false},
 	}
 
@@ -79,7 +79,7 @@ func Test_writeResolveConfig(t *testing.T) {
 	}{
 		{name: "overwrite file",
 			args:    args{configPath: tmpFileName},
-			want:    "[Resolve]\nDNS=127.0.0.1\nDomains=~.\n",
+			want:    "[Resolve]\nDNS=127.0.0.1 172.17.0.1\nDomains=~.\n",
 			wantErr: false},
 	}
 	for _, tt := range tests {
