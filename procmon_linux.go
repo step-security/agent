@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 
 	"io/ioutil"
 	"os"
@@ -55,7 +56,13 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		if len(workingDirectory) == 0 {
 			workingDirectory = "/home/runner"
 		}
-		r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag))
+
+		auditRule := fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag)
+		if runtime.GOARCH == "arm64" {
+			auditRule = fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S openat -S renameat -k %s", workingDirectory, fileMonitorTag)
+		}
+
+		r, _ := flags.Parse(auditRule)
 
 		actualBytes, _ := rule.Build(r)
 
