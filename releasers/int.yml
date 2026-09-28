@@ -26,3 +26,4 @@ builds:
     # This overrides `goos`, `goarch`, `goarm`, `gomips` and `ignores`.
     targets:
       - linux_amd64
+      - linux_arm64 

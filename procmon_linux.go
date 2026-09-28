@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 
 	"io/ioutil"
 	"os"
@@ -55,7 +56,10 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		if len(workingDirectory) == 0 {
 			workingDirectory = "/home/runner"
 		}
-		r, _ := flags.Parse(fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag))
+
+		auditRule := fileMonitorAuditRule(workingDirectory, runtime.GOARCH)
+
+		r, _ := flags.Parse(auditRule)
 
 		actualBytes, _ := rule.Build(r)
 
@@ -148,6 +152,14 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("\n")
 
 	p.receive(client)
+}
+
+func fileMonitorAuditRule(workingDirectory, goarch string) string {
+	if goarch == "arm64" {
+		return fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S openat -S renameat -k %s", workingDirectory, fileMonitorTag)
+	}
+
+	return fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag)
 }
 
 func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
