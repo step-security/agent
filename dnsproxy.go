@@ -251,7 +251,7 @@ func (proxy *DNSProxy) getIPByDomain(domain string) (string, error) {
 
 	go proxy.ApiClient.sendDNSRecord(proxy.CorrelationId, proxy.Repo, domain, answer.Data, "", "")
 
-	go proxy.submitDNSEvent(answer.Data)
+	go proxy.submitDNSEvent(domain)
 
 	return answer.Data, nil
 
