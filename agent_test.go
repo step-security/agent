@@ -258,7 +258,7 @@ func Test_addImplicitEndpoints_RemovesGlobalBlocklistedEndpoints(t *testing.T) {
 		"*.example.com.":           {{domainName: "*.example.com.", port: 443}},
 	}
 
-	filteredAllowedEndpoints, filteredWildcardEndpoints := addImplicitEndpoints(endpoints, true, globalBlocklist)
+	filteredAllowedEndpoints, filteredWildcardEndpoints := addImplicitEndpoints(endpoints, true, globalBlocklist, nil)
 
 	if _, found := filteredAllowedEndpoints["allowed.com."]; found {
 		t.Fatalf("expected allowed.com to be removed")
@@ -274,6 +274,35 @@ func Test_addImplicitEndpoints_RemovesGlobalBlocklistedEndpoints(t *testing.T) {
 
 	if _, found := filteredWildcardEndpoints["*.example.com."]; !found {
 		t.Fatalf("expected *.example.com to remain")
+	}
+}
+
+func Test_addImplicitEndpoints_AddsGithubMetaDomains(t *testing.T) {
+	// Meta domains arrive in Fqdn form (trailing dot), as produced by
+	// getGithubMetaDomains.
+	githubMetaDomains := []Endpoint{
+		{domainName: "ghcr.io.", port: 443},
+		{domainName: "*.pkg.github.com.", port: 443},
+		{domainName: "blocklisted.github.io.", port: 443},
+	}
+
+	globalBlocklist := NewGlobalBlocklist(&GlobalBlocklistResponse{
+		Domains: []CompromisedEndpoint{{Endpoint: "blocklisted.github.io", Reason: "blocked"}},
+	})
+
+	allowedEndpoints, wildcardEndpoints := addImplicitEndpoints(map[string][]Endpoint{}, true, globalBlocklist, githubMetaDomains)
+
+	if _, found := allowedEndpoints["ghcr.io."]; !found {
+		t.Fatalf("expected meta domain ghcr.io. to be added")
+	}
+
+	if _, found := wildcardEndpoints["*.pkg.github.com."]; !found {
+		t.Fatalf("expected wildcard meta domain *.pkg.github.com. to be added")
+	}
+
+	// Global blocklist filtering must still apply to meta domains
+	if _, found := allowedEndpoints["blocklisted.github.io."]; found {
+		t.Fatalf("expected blocklisted meta domain to be removed")
 	}
 }
 
