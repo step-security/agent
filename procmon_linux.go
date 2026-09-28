@@ -57,10 +57,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 			workingDirectory = "/home/runner"
 		}
 
-		auditRule := fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag)
-		if runtime.GOARCH == "arm64" {
-			auditRule = fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S openat -S renameat -k %s", workingDirectory, fileMonitorTag)
-		}
+		auditRule := fileMonitorAuditRule(workingDirectory, runtime.GOARCH)
 
 		r, _ := flags.Parse(auditRule)
 
@@ -155,6 +152,14 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("\n")
 
 	p.receive(client)
+}
+
+func fileMonitorAuditRule(workingDirectory, goarch string) string {
+	if goarch == "arm64" {
+		return fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S openat -S renameat -k %s", workingDirectory, fileMonitorTag)
+	}
+
+	return fmt.Sprintf("-a exit,always -F dir=%s -F perm=wa -S open -S openat -S rename -S renameat -k %s", workingDirectory, fileMonitorTag)
 }
 
 func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
