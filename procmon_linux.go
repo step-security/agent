@@ -165,7 +165,7 @@ func fileMonitorAuditRule(workingDirectory, goarch string) string {
 func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 
 	p.Events = make(map[int]*Event)
-	eventHandler := EventHandler{CorrelationId: p.CorrelationId, Repo: p.Repo, ApiClient: p.ApiClient, DNSProxy: p.DNSProxy}
+	eventHandler := EventHandler{CorrelationId: p.CorrelationId, Repo: p.Repo, ApiClient: p.ApiClient, DNSProxy: p.DNSProxy, ExemptFiles: p.ExemptFiles}
 	eventHandler.ProcessConnectionMap = make(map[string]bool)
 	eventHandler.ProcessFileMap = make(map[string]bool)
 	eventHandler.SourceCodeMap = make(map[string][]*Event)

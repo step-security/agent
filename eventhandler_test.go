@@ -69,6 +69,32 @@ func TestEventHandler_HandleEvent(t *testing.T) {
 	}
 }
 
+func TestEventHandler_isExemptFile(t *testing.T) {
+	eventHandler := &EventHandler{
+		ExemptFiles: []string{"dist/index.js", "package-lock.json", "my dir/notes.txt"},
+	}
+
+	tests := []struct {
+		name     string
+		fileName string
+		want     bool
+	}{
+		{name: "repo-relative path suffix match", fileName: "/home/runner/work/repo/repo/dist/index.js", want: true},
+		{name: "single filename suffix match", fileName: "/home/runner/work/repo/repo/package-lock.json", want: true},
+		{name: "exact match", fileName: "dist/index.js", want: true},
+		{name: "path with space preserved", fileName: "/home/runner/work/repo/my dir/notes.txt", want: true},
+		{name: "non-exempt file", fileName: "/home/runner/work/repo/repo/src/main.go", want: false},
+		{name: "partial name is not exempted", fileName: "/home/runner/work/repo/repo/not-package-lock.json", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := eventHandler.isExemptFile(tt.fileName); got != tt.want {
+				t.Errorf("isExemptFile(%q) = %v, want %v", tt.fileName, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGetContainerIdByPid(t *testing.T) {
 	type args struct {
 		cgroupPath string
