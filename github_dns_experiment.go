@@ -54,18 +54,7 @@ func isGithubDNSExperimentPresent() bool {
 }
 
 func revertGithubDNSExperiment() error {
-	for _, service := range githubDNSExperimentServices {
-		if !isServiceActive(service) {
-			continue
-		}
-		if err := exec.Command("sudo", "systemctl", "stop", service).Run(); err != nil {
-			return fmt.Errorf("error stopping %s: %v", service, err)
-		}
-		if isServiceActive(service) {
-			return fmt.Errorf("%s is still active", service)
-		}
-	}
-
+	// repoint dns away from github's resolver before stopping it, so a failure at any step leaves dns working
 	for _, dropInPath := range githubDNSDropInPaths {
 		if err := os.Remove(dropInPath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("error removing %s: %v", dropInPath, err)
@@ -76,20 +65,42 @@ func revertGithubDNSExperiment() error {
 		return fmt.Errorf("error restarting systemd-resolved: %v", err)
 	}
 
-	if _, err := os.Stat(stubResolvConfPath); err != nil {
-		return fmt.Errorf("error finding %s: %v", stubResolvConfPath, err)
+	if err := linkResolvConfToStub(); err != nil {
+		return err
 	}
 
-	if err := os.Remove(etcResolvConfPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("error removing %s: %v", etcResolvConfPath, err)
-	}
-
-	if err := os.Symlink(stubResolvConfPath, etcResolvConfPath); err != nil {
-		return fmt.Errorf("error linking %s to %s: %v", etcResolvConfPath, stubResolvConfPath, err)
+	// github's services are no longer in the dns path, so failing to stop them is not fatal
+	for _, service := range githubDNSExperimentServices {
+		if !isServiceActive(service) {
+			continue
+		}
+		if err := exec.Command("sudo", "systemctl", "stop", service).Run(); err != nil {
+			WriteLog(fmt.Sprintf("[github-dns-experiment] error stopping %s: %v", service, err))
+		}
 	}
 
 	if err := exec.Command("sudo", "resolvectl", "flush-caches").Run(); err != nil {
 		WriteLog(fmt.Sprintf("[github-dns-experiment] error flushing dns caches: %v", err))
+	}
+
+	return nil
+}
+
+// linkResolvConfToStub atomically points /etc/resolv.conf to systemd-resolved's stub resolver
+func linkResolvConfToStub() error {
+	if _, err := os.Stat(stubResolvConfPath); err != nil {
+		return fmt.Errorf("error finding %s: %v", stubResolvConfPath, err)
+	}
+
+	tmpPath := etcResolvConfPath + ".tmp"
+	os.Remove(tmpPath)
+	if err := os.Symlink(stubResolvConfPath, tmpPath); err != nil {
+		return fmt.Errorf("error creating %s: %v", tmpPath, err)
+	}
+
+	if err := os.Rename(tmpPath, etcResolvConfPath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("error linking %s to %s: %v", etcResolvConfPath, stubResolvConfPath, err)
 	}
 
 	return nil
