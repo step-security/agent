@@ -1,6 +1,6 @@
 module github.com/step-security/agent
 
-go 1.26.2
+go 1.27.3
 
 require (
 	github.com/coreos/go-iptables v0.6.0
