@@ -82,6 +82,10 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	WriteLog("\n")
 	globalFlags := GetGlobalFeatureFlags()
 
+	if globalFlags.RevertGithubDNSExperiment {
+		RevertGithubDNSExperiment()
+	}
+
 	globalBlocklistResponse, err := apiclient.getGlobalBlocklist()
 	globalBlocklist := NewGlobalBlocklist(globalBlocklistResponse)
 	if err != nil {
