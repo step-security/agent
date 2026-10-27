@@ -11,13 +11,15 @@ import (
 // which bypasses the agent's DNS server and results in allowed connections being dropped.
 // ref: https://github.com/step-security/harden-runner/issues/708
 const (
-	githubDNSDropInPath      = "/etc/systemd/resolved.conf.d/90-egress-proxy.conf"
 	githubDNSResolverAddress = "127.0.0.100"
 	etcResolvConfPath        = "/etc/resolv.conf"
 	stubResolvConfPath       = "/run/systemd/resolve/stub-resolv.conf"
 )
 
 var githubDNSExperimentServices = []string{"egress-dns-resolver.service", "egress-outbound-proxy.service"}
+
+// systemd-resolved reads drop-ins from both /etc and /run
+var githubDNSDropInPaths = []string{"/etc/systemd/resolved.conf.d/90-egress-proxy.conf", "/run/systemd/resolved.conf.d/90-egress-proxy.conf"}
 
 // RevertGithubDNSExperiment reverts github's dns experiment, if it is present on the runner
 func RevertGithubDNSExperiment() {
@@ -35,8 +37,10 @@ func RevertGithubDNSExperiment() {
 }
 
 func isGithubDNSExperimentPresent() bool {
-	if _, err := os.Stat(githubDNSDropInPath); err == nil {
-		return true
+	for _, dropInPath := range githubDNSDropInPaths {
+		if _, err := os.Stat(dropInPath); err == nil {
+			return true
+		}
 	}
 
 	for _, service := range githubDNSExperimentServices {
@@ -62,8 +66,10 @@ func revertGithubDNSExperiment() error {
 		}
 	}
 
-	if err := os.Remove(githubDNSDropInPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("error removing %s: %v", githubDNSDropInPath, err)
+	for _, dropInPath := range githubDNSDropInPaths {
+		if err := os.Remove(dropInPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error removing %s: %v", dropInPath, err)
+		}
 	}
 
 	if err := exec.Command("sudo", "systemctl", "restart", "systemd-resolved").Run(); err != nil {
