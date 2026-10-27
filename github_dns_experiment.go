@@ -1,0 +1,95 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+)
+
+// GitHub is experimenting with a DNS resolver and an outbound proxy on hosted runners,
+// which bypasses the agent's DNS server and results in allowed connections being dropped.
+// ref: https://github.com/step-security/harden-runner/issues/708
+const (
+	githubDNSDropInPath      = "/etc/systemd/resolved.conf.d/90-egress-proxy.conf"
+	githubDNSResolverAddress = "127.0.0.100"
+	etcResolvConfPath        = "/etc/resolv.conf"
+	stubResolvConfPath       = "/run/systemd/resolve/stub-resolv.conf"
+)
+
+var githubDNSExperimentServices = []string{"egress-dns-resolver.service", "egress-outbound-proxy.service"}
+
+// RevertGithubDNSExperiment reverts github's dns experiment, if it is present on the runner
+func RevertGithubDNSExperiment() {
+	if !isGithubDNSExperimentPresent() {
+		WriteLog("[github-dns-experiment] not detected")
+		return
+	}
+
+	WriteLog("[github-dns-experiment] detected, reverting")
+	if err := revertGithubDNSExperiment(); err != nil {
+		WriteLog(fmt.Sprintf("[github-dns-experiment] error reverting: %v", err))
+		return
+	}
+	WriteLog("[github-dns-experiment] reverted")
+}
+
+func isGithubDNSExperimentPresent() bool {
+	if _, err := os.Stat(githubDNSDropInPath); err == nil {
+		return true
+	}
+
+	for _, service := range githubDNSExperimentServices {
+		if isServiceActive(service) {
+			return true
+		}
+	}
+
+	resolvConf, err := os.ReadFile(etcResolvConfPath)
+	return err == nil && strings.Contains(string(resolvConf), githubDNSResolverAddress)
+}
+
+func revertGithubDNSExperiment() error {
+	for _, service := range githubDNSExperimentServices {
+		if !isServiceActive(service) {
+			continue
+		}
+		if err := exec.Command("sudo", "systemctl", "stop", service).Run(); err != nil {
+			return fmt.Errorf("error stopping %s: %v", service, err)
+		}
+		if isServiceActive(service) {
+			return fmt.Errorf("%s is still active", service)
+		}
+	}
+
+	if err := os.Remove(githubDNSDropInPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error removing %s: %v", githubDNSDropInPath, err)
+	}
+
+	if err := exec.Command("sudo", "systemctl", "restart", "systemd-resolved").Run(); err != nil {
+		return fmt.Errorf("error restarting systemd-resolved: %v", err)
+	}
+
+	if _, err := os.Stat(stubResolvConfPath); err != nil {
+		return fmt.Errorf("error finding %s: %v", stubResolvConfPath, err)
+	}
+
+	if err := os.Remove(etcResolvConfPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error removing %s: %v", etcResolvConfPath, err)
+	}
+
+	if err := os.Symlink(stubResolvConfPath, etcResolvConfPath); err != nil {
+		return fmt.Errorf("error linking %s to %s: %v", etcResolvConfPath, stubResolvConfPath, err)
+	}
+
+	if err := exec.Command("sudo", "resolvectl", "flush-caches").Run(); err != nil {
+		WriteLog(fmt.Sprintf("[github-dns-experiment] error flushing dns caches: %v", err))
+	}
+
+	return nil
+}
+
+func isServiceActive(service string) bool {
+	output, _ := exec.Command("systemctl", "is-active", service).Output()
+	return strings.TrimSpace(string(output)) == "active"
+}

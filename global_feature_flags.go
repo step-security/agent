@@ -15,6 +15,7 @@ type GlobalFeatureFlags struct {
 	EnableArmour               bool   `json:"enable_armour"`
 	EnableCustomDetectionRules bool   `json:"enable_custom_detection_rules"`
 	DisableKillEnforcement     bool   `json:"disable_kill_enforcement,omitempty"`
+	RevertGithubDNSExperiment  bool   `json:"revert_github_dns_experiment,omitempty"`
 }
 
 // GlobalFeatureFlagManager manages fetching and caching of global feature flags.
