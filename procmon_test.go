@@ -383,3 +383,83 @@ func TestNoteReceiveError(t *testing.T) {
 		}
 	}
 }
+
+func TestHasDetectionRecord(t *testing.T) {
+	msg := func(typ auparse.AuditMessageType) *auparse.AuditMessage {
+		return &auparse.AuditMessage{RecordType: typ}
+	}
+	tests := []struct {
+		name string
+		msgs []*auparse.AuditMessage
+		want bool
+	}{
+		{"send without address", []*auparse.AuditMessage{msg(auparse.AUDIT_SYSCALL), msg(auparse.AUDIT_PROCTITLE), msg(auparse.AUDIT_EOE)}, false},
+		{"syscall only", []*auparse.AuditMessage{msg(auparse.AUDIT_SYSCALL)}, false},
+		{"empty", nil, false},
+		{"connect", []*auparse.AuditMessage{msg(auparse.AUDIT_SYSCALL), msg(auparse.AUDIT_SOCKADDR), msg(auparse.AUDIT_PROCTITLE)}, true},
+		{"execve", []*auparse.AuditMessage{msg(auparse.AUDIT_SYSCALL), msg(auparse.AUDIT_EXECVE), msg(auparse.AUDIT_CWD)}, true},
+		{"file", []*auparse.AuditMessage{msg(auparse.AUDIT_SYSCALL), msg(auparse.AUDIT_CWD), msg(auparse.AUDIT_PATH)}, true},
+		{"other record type", []*auparse.AuditMessage{msg(auparse.AUDIT_SYSCALL), msg(auparse.AUDIT_CONFIG_CHANGE)}, true},
+	}
+	for _, tt := range tests {
+		if got := hasDetectionRecord(tt.msgs); got != tt.want {
+			t.Errorf("%s: hasDetectionRecord() = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+// Events that are not parsed must be ones that full parsing would not have
+// dispatched either.
+func TestEventsWithoutDetectionRecordsAreNeverReady(t *testing.T) {
+	events := [][]auditRecord{
+		{syscallRecord(60, 44, "python3", "/usr/bin/python3.12", "netmon"), proctitleRecord(60), eoeRecord(60)},
+		{syscallRecord(61, 46, "node", "/usr/bin/node", "netmon"), proctitleRecord(61)},
+		{syscallRecord(62, 42, "curl", "/usr/bin/curl", "netmon")},
+		{syscallRecord(63, 59, "bash", "/usr/bin/bash", "procmon"), proctitleRecord(63)},
+		{syscallRecord(64, 257, "cp", "/usr/bin/cp", "filemon"), proctitleRecord(64)},
+		// values the kernel hex-encodes because they contain spaces
+		{{auparse.AUDIT_SYSCALL, `audit(1700000000.000:65): arch=c000003e syscall=44 success=yes exit=1 a0=3 a1=7f00 a2=1 a3=0 items=0 ppid=1 pid=165 auid=4294967295 uid=1001 gid=1001 euid=1001 suid=1001 fsuid=1001 egid=1001 sgid=1001 fsgid=1001 tty=(none) ses=4294967295 comm=6164647220616464723D312E322E332E34 exe="/tmp/x" key="netmon"`},
+			{auparse.AUDIT_PROCTITLE, `audit(1700000000.000:65): proctitle=6E6320616464723D312E322E332E3420706F72743D343433`}},
+	}
+	for i, records := range events {
+		var msgs []*auparse.AuditMessage
+		for _, rec := range records {
+			msg, err := auparse.Parse(rec.msgType, rec.text)
+			if err != nil {
+				t.Fatalf("event %d: parse %v: %v", i, rec.msgType, err)
+			}
+			msgs = append(msgs, msg)
+		}
+		if hasDetectionRecord(msgs) {
+			t.Fatalf("event %d: expected no detection record", i)
+		}
+		event := &Event{}
+		for _, msg := range msgs {
+			event.addRecord(msg.ToMapStr())
+		}
+		if isEventReady(event) {
+			t.Errorf("event %d: fully parsed event is ready: %+v", i, event)
+		}
+	}
+}
+
+func TestReassemblySkipsParsingEventsWithoutDetectionRecords(t *testing.T) {
+	r, stream, rec, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+
+	// an arch that cannot be decoded is a field error, but only if parsed
+	pushRecords(t, r, []auditRecord{
+		{auparse.AUDIT_SYSCALL, `audit(1700000000.000:70): arch=zz syscall=44 success=yes exit=1 a0=3 a1=7f00 a2=1 a3=0 items=0 ppid=1 pid=170 comm="python3" exe="/usr/bin/python3.12" key="netmon"`},
+		proctitleRecord(70),
+		eoeRecord(70),
+	})
+
+	if stream.delivered.Load() != 1 {
+		t.Fatalf("expected the event to be delivered once, got %d", stream.delivered.Load())
+	}
+	if got := p.recordErrors.Load(); got != 0 {
+		t.Fatalf("expected the event not to be parsed, got %d field errors", got)
+	}
+	if got := rec.dispatched(); len(got) != 0 {
+		t.Fatalf("expected nothing dispatched, got %+v", got)
+	}
+}
