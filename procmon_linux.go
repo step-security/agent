@@ -151,9 +151,7 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	WriteLog("receive called")
 	WriteLog("\n")
 
-	if err := p.receive(client); err != nil {
-		WriteLog(fmt.Sprintf("[procmon] receive stopped: %v", err))
-	}
+	p.receive(client)
 }
 
 func fileMonitorAuditRule(workingDirectory, goarch string) string {
@@ -177,10 +175,6 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 	for {
 		rawEvent, err := r.Receive(false)
 		if err != nil {
-			if isReceiveOverflow(err) {
-				p.noteReceiveOverflow()
-				continue
-			}
 			return errors.Wrap(err, "receive failed")
 		}
 
@@ -194,8 +188,12 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 		if err != nil {
 			return errors.Wrap(err, "parse failed.")
 		}
-		if event := p.handleRecord(rawEvent.Type, message); event != nil {
-			go eventHandler.HandleEvent(event)
+		eventMap := message.ToMapStr()
+
+		p.PrepareEvent(int(message.Sequence), eventMap)
+		if isEventReady(p.Events[int(message.Sequence)]) {
+			p.markEventSent(p.Events[int(message.Sequence)])
+			go eventHandler.HandleEvent(p.Events[int(message.Sequence)])
 		}
 
 	}
