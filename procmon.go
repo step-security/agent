@@ -168,10 +168,11 @@ func (s *auditStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
 }
 
 // hasDetectionRecord reports whether an event has a record other than SYSCALL,
-// PROCTITLE and EOE. Those three never carry an address, path, working
-// directory or arguments, so an event made only of them is never ready and is
-// not parsed. Most events on a busy runner are of this kind: a send on a
-// connected socket has no SOCKADDR record.
+// PROCTITLE and EOE. A detection's address, path, working directory and
+// arguments come from the SOCKADDR, PATH, CWD and EXECVE records, so an event
+// made only of those three is not parsed. Most events on a busy runner are of
+// this kind: a send on a connected socket has no SOCKADDR record. Field errors
+// in skipped events are not counted.
 func hasDetectionRecord(msgs []*auparse.AuditMessage) bool {
 	for _, msg := range msgs {
 		switch msg.RecordType {

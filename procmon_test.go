@@ -435,7 +435,11 @@ func TestEventsWithoutDetectionRecordsAreNeverReady(t *testing.T) {
 		}
 		event := &Event{}
 		for _, msg := range msgs {
-			event.addRecord(msg.ToMapStr())
+			eventMap := msg.ToMapStr()
+			if parseErr, found := eventMap["error"]; found {
+				t.Fatalf("event %d: %v record not parsed: %v", i, msg.RecordType, parseErr)
+			}
+			event.addRecord(eventMap)
 		}
 		if isEventReady(event) {
 			t.Errorf("event %d: fully parsed event is ready: %+v", i, event)
