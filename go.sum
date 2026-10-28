@@ -45,6 +45,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elastic/go-libaudit/v2 v2.3.2 h1:qWNcA3nkwNEGh1UBDbDTVF55KR6SM1W2Ji1LGDqFEpw=
 github.com/elastic/go-libaudit/v2 v2.3.2/go.mod h1:+ZE0czqmbqtnRkl0fNgpI+HvVVRo/ZMJdcXv/PaKcOo=
+github.com/elastic/go-libaudit/v2 v2.6.2 h1:1PM6wVBTJHJQYsKl8jfA9/Aw9pFty5uUezPiUfKtOI4=
+github.com/elastic/go-libaudit/v2 v2.6.2/go.mod h1:8205nkf2oSrXFlO4H5j8/cyVMoSF3Y7jt+FjgS4ubQU=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/florianl/go-nflog/v2 v2.0.1 h1:8csWIqFQ2vDaZJkxezY3dXDB7bEFg0VRFsYd2Bzj3II=
