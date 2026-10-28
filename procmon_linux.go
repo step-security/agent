@@ -10,6 +10,9 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/elastic/go-libaudit/v2"
 	"github.com/elastic/go-libaudit/v2/auparse"
@@ -166,7 +169,6 @@ func fileMonitorAuditRule(workingDirectory, goarch string) string {
 
 func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 
-	p.Events = make(map[int]*Event)
 	eventHandler := EventHandler{CorrelationId: p.CorrelationId, Repo: p.Repo, ApiClient: p.ApiClient, DNSProxy: p.DNSProxy}
 	eventHandler.ProcessConnectionMap = make(map[string]bool)
 	eventHandler.ProcessFileMap = make(map[string]bool)
@@ -174,14 +176,41 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 	eventHandler.ProcessMap = make(map[string]*Process)
 	eventHandler.FileOverwriteCounterMap = make(map[string]int)
 
+	dispatch := p.dispatchEvent
+	if dispatch == nil {
+		dispatch = func(event *Event) { go eventHandler.HandleEvent(event) }
+	}
+
+	reassembler, err := libaudit.NewReassembler(reassemblerMaxInFlight, reassemblerTimeout, &auditStream{monitor: p, dispatch: dispatch})
+	if err != nil {
+		return errors.Wrap(err, "create reassembler")
+	}
+	done := make(chan struct{})
+	var maintaining sync.WaitGroup
+	maintaining.Add(1)
+	go func() {
+		defer maintaining.Done()
+		maintainReassembler(reassembler, done)
+	}()
+	// stop maintenance before the final flush, so no callback runs after return
+	defer func() {
+		close(done)
+		maintaining.Wait()
+		reassembler.Close()
+	}()
+
 	for {
 		rawEvent, err := r.Receive(false)
 		if err != nil {
-			if isReceiveOverflow(err) {
-				p.noteReceiveOverflow()
-				continue
+			// EBADF means the client was closed
+			if errors.Is(err, syscall.EBADF) {
+				return errors.Wrap(err, "receive failed")
 			}
-			return errors.Wrap(err, "receive failed")
+			p.noteReceiveError(err)
+			if !errors.Is(err, syscall.ENOBUFS) {
+				time.Sleep(10 * time.Millisecond) // do not spin on a persistent error
+			}
+			continue
 		}
 
 		// Messages from 1300-2999 are valid audit messages.
@@ -190,14 +219,26 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 			continue
 		}
 
-		message, err := auparse.Parse(rawEvent.Type, string(rawEvent.Data))
-		if err != nil {
-			return errors.Wrap(err, "parse failed.")
+		if err := reassembler.Push(rawEvent.Type, rawEvent.Data); err != nil {
+			noteLoss(&p.invalidRecords, 1, fmt.Sprintf("dropped audit record with an invalid header: %v", err))
 		}
-		if event := p.handleRecord(rawEvent.Type, message); event != nil {
-			go eventHandler.HandleEvent(event)
-		}
+	}
+}
 
+// maintainReassembler gives up on events whose last record did not arrive in
+// time, as Auditbeat does, until done is closed.
+func maintainReassembler(r *libaudit.Reassembler, done <-chan struct{}) {
+	ticker := time.NewTicker(reassemblerMaintain)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if err := r.Maintain(); err != nil {
+				return
+			}
+		}
 	}
 }
 

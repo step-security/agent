@@ -3,8 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math/bits"
 	"strconv"
-	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -17,13 +18,14 @@ const (
 	processMonitorTag = "procmon"
 )
 
-// pendingEventWindow is how many audit records may arrive without touching an
-// event before it is dropped. Events are retired on their EOE record; this
-// catches the ones that never get one, such as single-record events. It also
-// bounds the map: at most this many events can have been touched recently.
-// An event whose remaining records arrive after it was dropped is lost, since
-// the late records alone do not make it ready.
-const pendingEventWindow = 8192
+// Audit records are grouped into events by go-libaudit's reassembler, with the
+// same limits Auditbeat uses by default: at most 50 events in flight, and an
+// event without its last record is given up after 2 seconds.
+const (
+	reassemblerMaxInFlight = 50
+	reassemblerTimeout     = 2 * time.Second
+	reassemblerMaintain    = 500 * time.Millisecond
+)
 
 type ProcessMonitor struct {
 	CorrelationId         string
@@ -32,12 +34,15 @@ type ProcessMonitor struct {
 	DNSProxy              *DNSProxy
 	WorkingDirectory      string
 	DisableFileMonitoring bool
-	Events                map[int]*Event
-	mutex                 sync.RWMutex
 
-	records         int64
-	droppedEvents   int
-	receiveOverflow int
+	// dispatchEvent replaces the event handler in tests
+	dispatchEvent func(*Event)
+
+	sequenceGaps    atomic.Int64
+	receiveOverflow atomic.Int64
+	receiveErrors   atomic.Int64
+	invalidRecords  atomic.Int64
+	recordErrors    atomic.Int64
 }
 
 type Process struct {
@@ -52,37 +57,22 @@ type Process struct {
 }
 
 type Event struct {
-	FileName          string
-	Path              string
-	Syscall           string
-	Exe               string
-	IPAddress         string
-	Port              string
-	Pid               string
-	ProcessArguments  []string
-	PPid              string
-	Euid              string
-	Timestamp         time.Time
-	EventType         string
-	Status            string
-	SentForProcessing bool
-	lastRecord        int64
+	FileName         string
+	Path             string
+	Syscall          string
+	Exe              string
+	IPAddress        string
+	Port             string
+	Pid              string
+	ProcessArguments []string
+	PPid             string
+	Euid             string
+	Timestamp        time.Time
+	EventType        string
+	Status           string
 }
 
-func (p *ProcessMonitor) PrepareEvent(sequence int, eventMap map[string]interface{}) *Event {
-	p.mutex.Lock()
-	p.records++
-	event, found := p.Events[sequence]
-	if !found {
-		event = &Event{}
-		p.Events[sequence] = event
-	}
-	// refreshed before the sweep, so the event being prepared is never dropped
-	event.lastRecord = p.records
-	if !found && len(p.Events) > 2*pendingEventWindow {
-		p.dropIdleEventsLocked()
-	}
-
+func (event *Event) addRecord(eventMap map[string]interface{}) {
 	// Tags
 	value, found := eventMap["tags"]
 
@@ -136,13 +126,11 @@ func (p *ProcessMonitor) PrepareEvent(sequence int, eventMap map[string]interfac
 
 	if found {
 		nameTypeStr := fmt.Sprintf("%v", nameType)
-		if nameTypeStr == "DELETE" || nameTypeStr == "CREATE" || nameTypeStr == "NORMAL" {
+		// the first qualifying PATH wins, as when events were dispatched on it
+		if (nameTypeStr == "DELETE" || nameTypeStr == "CREATE" || nameTypeStr == "NORMAL") && event.FileName == "" {
 			event.FileName = getValue("name", eventMap)
 		}
 	}
-
-	p.mutex.Unlock()
-	return event
 }
 
 func getValue(key string, eventMap map[string]interface{}) string {
@@ -154,69 +142,62 @@ func getValue(key string, eventMap map[string]interface{}) string {
 	return ""
 }
 
-// handleRecord adds one audit record to its event and returns the event once
-// it is ready to dispatch. The EOE record ends a multi-record event, so the
-// event is removed then.
-func (p *ProcessMonitor) handleRecord(msgType auparse.AuditMessageType, message *auparse.AuditMessage) *Event {
-	sequence := int(message.Sequence)
-	if msgType == auparse.AUDIT_EOE {
-		p.retireEvent(sequence)
-		return nil
-	}
-
-	event := p.PrepareEvent(sequence, message.ToMapStr())
-	if !isEventReady(event) {
-		return nil
-	}
-	p.markEventSent(event)
-	return event
+// auditStream receives complete events from the reassembler and dispatches
+// the ones the event handler uses. Every event is delivered once, including
+// incomplete ones that are evicted, so nothing is kept after delivery.
+type auditStream struct {
+	monitor  *ProcessMonitor
+	dispatch func(*Event)
 }
 
-// retireEvent removes a sequence once its EOE record arrives. Handlers keep
-// their own pointer, so an event already dispatched is unaffected.
-func (p *ProcessMonitor) retireEvent(sequence int) {
-	p.mutex.Lock()
-	delete(p.Events, sequence)
-	p.mutex.Unlock()
-}
-
-func (p *ProcessMonitor) dropIdleEventsLocked() {
-	dropped := 0
-	for sequence, event := range p.Events {
-		if event.lastRecord <= p.records-pendingEventWindow {
-			delete(p.Events, sequence)
-			dropped++
+func (s *auditStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
+	event := &Event{}
+	for _, msg := range msgs {
+		eventMap := msg.ToMapStr()
+		if parseErr, found := eventMap["error"]; found {
+			noteLoss(&s.monitor.recordErrors, 1, fmt.Sprintf("audit record fields not parsed: %v", parseErr))
 		}
+		event.addRecord(eventMap)
 	}
-	p.droppedEvents += dropped
-	WriteLog(fmt.Sprintf("[procmon] dropped %d audit events without EOE, total=%d", dropped, p.droppedEvents))
-}
-
-// isReceiveOverflow reports whether the kernel dropped audit messages because
-// the netlink socket was full. The socket stays usable, so receiving continues.
-func isReceiveOverflow(err error) bool {
-	return errors.Is(err, syscall.ENOBUFS)
-}
-
-func (p *ProcessMonitor) noteReceiveOverflow() {
-	p.receiveOverflow++
-	// log on 1, 2, 4, 8, ... so a sustained overflow does not flood the log
-	if p.receiveOverflow&(p.receiveOverflow-1) == 0 {
-		WriteLog(fmt.Sprintf("[procmon] audit messages lost, netlink buffer full, total=%d", p.receiveOverflow))
+	if isEventReady(event) {
+		s.dispatch(event)
 	}
 }
 
-func (p *ProcessMonitor) markEventSent(event *Event) {
-	p.mutex.Lock()
-	event.SentForProcessing = true
-	p.mutex.Unlock()
+// EventsLost is called for gaps in the audit sequence numbers. A gap is not
+// always a loss, since record types this agent skips use sequence numbers too.
+func (s *auditStream) EventsLost(count int) {
+	// go-libaudit v2.3.2 underflows when a record arrives after its event was
+	// given up, which shows up as a huge count
+	if count <= 0 || count > 1<<24 {
+		return
+	}
+	noteLoss(&s.monitor.sequenceGaps, int64(count), "gaps in audit sequence numbers")
+}
+
+// noteReceiveError counts a failed receive. A full netlink socket (ENOBUFS)
+// means the kernel dropped messages; the socket stays usable either way.
+func (p *ProcessMonitor) noteReceiveError(err error) {
+	if errors.Is(err, syscall.ENOBUFS) {
+		noteLoss(&p.receiveOverflow, 1, "audit netlink buffer overflowed, kernel dropped messages")
+		return
+	}
+	noteLoss(&p.receiveErrors, 1, fmt.Sprintf("audit receive error: %v", err))
+}
+
+// noteLoss adds n to the counter and logs when the total reaches the next
+// power of two, so a sustained loss does not flood the log. It reports whether
+// it logged.
+func noteLoss(counter *atomic.Int64, n int64, what string) bool {
+	total := counter.Add(n)
+	if bits.Len64(uint64(total)) == bits.Len64(uint64(total-n)) {
+		return false
+	}
+	WriteLog(fmt.Sprintf("[procmon] %s, total=%d", what, total))
+	return true
 }
 
 func isEventReady(event *Event) bool {
-	if event.SentForProcessing {
-		return false
-	}
-
 	switch event.EventType {
 	case netMonitorTag:
 		if event.IPAddress != "" && event.Port != "" {

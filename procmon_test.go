@@ -4,135 +4,36 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
+	"time"
 
+	"github.com/elastic/go-libaudit/v2"
 	"github.com/elastic/go-libaudit/v2/auparse"
 )
 
-func TestProcessMonitor_PrepareEvent(t *testing.T) {
-	processMonitor := &ProcessMonitor{}
-	processMonitor.Events = make(map[int]*Event)
+func TestEvent_addRecord(t *testing.T) {
+	netEvent := &Event{}
+	netEvent.addRecord(map[string]interface{}{"tags": []string{"netmon"}, "syscall": "connect"})
+	netEvent.addRecord(map[string]interface{}{"addr": "2.2.2.2", "port": "443"})
 
-	netEventPart1 := make(map[string]interface{})
-	netEventPart1["tags"] = []string{"netmon"}
-	netEventPart1["syscall"] = "connect"
-
-	netEventPart2 := make(map[string]interface{})
-	netEventPart2["addr"] = "2.2.2.2"
-	netEventPart2["port"] = "443"
-
-	processMonitor.PrepareEvent(1, netEventPart1)
-	processMonitor.PrepareEvent(1, netEventPart2)
-
-	isReady := isEventReady(processMonitor.Events[1])
-
-	if !isReady {
+	if !isEventReady(netEvent) {
 		t.Errorf("Event ready expected")
 	}
 
-	fileEventPart1 := make(map[string]interface{})
-	fileEventPart1["tags"] = []string{"filemon"}
-	fileEventPart1["syscall"] = "open"
+	fileEvent := &Event{}
+	fileEvent.addRecord(map[string]interface{}{"tags": []string{"filemon"}, "syscall": "open"})
+	fileEvent.addRecord(map[string]interface{}{"nametype": "CREATE", "name": "file1.txt"})
+	fileEvent.addRecord(map[string]interface{}{"cwd": "/dir"})
+	fileEvent.addRecord(map[string]interface{}{"argc": "2", "a0": "argv1", "a1": "argv2"})
+	// argc that cannot be converted to an int is logged and ignored
+	fileEvent.addRecord(map[string]interface{}{"argc": []string{"failed"}})
 
-	fileEventPart2 := make(map[string]interface{})
-	fileEventPart2["nametype"] = "CREATE"
-	fileEventPart2["name"] = "file1.txt"
-
-	fileEventPart3 := make(map[string]interface{})
-	fileEventPart3["cwd"] = "/dir"
-
-	// Testing procmon.go#93 [Process Start]
-	fileEventPart4 := make(map[string]interface{})
-	fileEventPart4["argc"] = "2"
-	fileEventPart4["a0"] = "argv1"
-	fileEventPart4["a1"] = "argv2"
-
-	// In procmon.go [Process Start] section,
-	// we are converting `argc` to INT.
-	// Because of below code, we will hit the error,
-	// in which we are unable to convert argc to INT.
-	// So, main intention was to cover that error handling block.
-	fileEventPart5 := make(map[string]interface{})
-	fileEventPart5["argc"] = []string{"failed"}
-	// ===== END =====
-
-	processMonitor.PrepareEvent(2, fileEventPart1)
-	processMonitor.PrepareEvent(2, fileEventPart2)
-	processMonitor.PrepareEvent(2, fileEventPart3)
-
-	processMonitor.PrepareEvent(2, fileEventPart4)
-	processMonitor.PrepareEvent(2, fileEventPart5)
-
-	isReady = isEventReady(processMonitor.Events[2])
-
-	if !isReady {
+	if !isEventReady(fileEvent) {
 		t.Errorf("Event ready expected")
-	}
-}
-
-func parseAuditRecord(t *testing.T, msgType auparse.AuditMessageType, text string) *auparse.AuditMessage {
-	t.Helper()
-	message, err := auparse.Parse(msgType, text)
-	if err != nil {
-		t.Fatalf("parse %v: %v", msgType, err)
-	}
-	return message
-}
-
-func TestHandleRecordRetiresSendWithoutAddressOnEOE(t *testing.T) {
-	p := &ProcessMonitor{Events: make(map[int]*Event)}
-
-	// send() on a connected socket: sendto with no SOCKADDR record
-	records := []struct {
-		msgType auparse.AuditMessageType
-		text    string
-	}{
-		{auparse.AUDIT_SYSCALL, `audit(1700000000.123:42): arch=c000003e syscall=44 success=yes exit=121 a0=3 a1=7f0000000000 a2=79 a3=0 items=0 ppid=1 pid=100 auid=4294967295 uid=1001 gid=1001 euid=1001 suid=1001 fsuid=1001 egid=1001 sgid=1001 fsgid=1001 tty=(none) ses=4294967295 comm="python3" exe="/usr/bin/python3.12" key="netmon"`},
-		{auparse.AUDIT_PROCTITLE, `audit(1700000000.123:42): proctitle=707974686F6E33`},
-	}
-	for _, r := range records {
-		if event := p.handleRecord(r.msgType, parseAuditRecord(t, r.msgType, r.text)); event != nil {
-			t.Fatalf("send without an address must not be dispatched, got %+v", event)
-		}
-	}
-	if event, ok := p.Events[42]; !ok || event.EventType != netMonitorTag || event.Syscall != "sendto" {
-		t.Fatalf("expected a pending sendto event before EOE, got %+v", p.Events[42])
-	}
-
-	p.handleRecord(auparse.AUDIT_EOE, parseAuditRecord(t, auparse.AUDIT_EOE, `audit(1700000000.123:42): `))
-	if len(p.Events) != 0 {
-		t.Fatalf("expected no pending events after EOE, got %d", len(p.Events))
-	}
-}
-
-func TestHandleRecordDispatchesConnectBeforeEOE(t *testing.T) {
-	p := &ProcessMonitor{Events: make(map[int]*Event)}
-
-	syscallRecord := `audit(1700000000.456:43): arch=c000003e syscall=42 success=yes exit=0 a0=3 a1=7ffd00000000 a2=10 a3=0 items=0 ppid=1 pid=101 auid=4294967295 uid=1001 gid=1001 euid=1001 suid=1001 fsuid=1001 egid=1001 sgid=1001 fsgid=1001 tty=(none) ses=4294967295 comm="curl" exe="/usr/bin/curl" key="netmon"`
-	if event := p.handleRecord(auparse.AUDIT_SYSCALL, parseAuditRecord(t, auparse.AUDIT_SYSCALL, syscallRecord)); event != nil {
-		t.Fatalf("connect is not ready before its address, got %+v", event)
-	}
-
-	// 192.0.2.10:443
-	sockaddr := `audit(1700000000.456:43): saddr=020001BBC000020A0000000000000000`
-	event := p.handleRecord(auparse.AUDIT_SOCKADDR, parseAuditRecord(t, auparse.AUDIT_SOCKADDR, sockaddr))
-	if event == nil {
-		t.Fatalf("expected connect to be dispatched once its address arrives")
-	}
-	if event.EventType != netMonitorTag || event.Syscall != "connect" || event.IPAddress != "192.0.2.10" || event.Port != "443" || !event.SentForProcessing {
-		t.Fatalf("unexpected dispatched event %+v", event)
-	}
-	if again := p.handleRecord(auparse.AUDIT_PROCTITLE, parseAuditRecord(t, auparse.AUDIT_PROCTITLE, `audit(1700000000.456:43): proctitle=6375726C`)); again != nil {
-		t.Fatalf("connect must be dispatched only once")
-	}
-
-	p.handleRecord(auparse.AUDIT_EOE, parseAuditRecord(t, auparse.AUDIT_EOE, `audit(1700000000.456:43): `))
-	if len(p.Events) != 0 {
-		t.Fatalf("expected no pending events after EOE, got %d", len(p.Events))
-	}
-	if event.IPAddress != "192.0.2.10" {
-		t.Fatalf("retiring the sequence must not change the dispatched event")
 	}
 }
 
@@ -141,180 +42,344 @@ type auditRecord struct {
 	text    string
 }
 
-// feedRecords passes records through handleRecord and returns the dispatched events.
-func feedRecords(t *testing.T, p *ProcessMonitor, records []auditRecord) []*Event {
-	t.Helper()
-	var dispatched []*Event
-	for _, r := range records {
-		if event := p.handleRecord(r.msgType, parseAuditRecord(t, r.msgType, r.text)); event != nil {
-			// copy, so later records for the sequence do not hide what was dispatched
-			snapshot := *event
-			dispatched = append(dispatched, &snapshot)
-		}
-	}
-	return dispatched
+// recordingDispatch collects the events an auditStream dispatches.
+type recordingDispatch struct {
+	mu     sync.Mutex
+	events []Event
 }
 
-func TestHandleRecordDispatchesDetectionsOnce(t *testing.T) {
+func (r *recordingDispatch) dispatch(event *Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, *event)
+}
+
+func (r *recordingDispatch) dispatched() []Event {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]Event(nil), r.events...)
+}
+
+// countingStream wraps an auditStream and counts every delivered event.
+type countingStream struct {
+	*auditStream
+	delivered atomic.Int64
+}
+
+func (c *countingStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
+	c.delivered.Add(1)
+	c.auditStream.ReassemblyComplete(msgs)
+}
+
+func newTestReassembler(t *testing.T, maxInFlight int, timeout time.Duration) (*libaudit.Reassembler, *countingStream, *recordingDispatch, *ProcessMonitor) {
+	t.Helper()
+	p := &ProcessMonitor{}
+	rec := &recordingDispatch{}
+	stream := &countingStream{auditStream: &auditStream{monitor: p, dispatch: rec.dispatch}}
+	r, err := libaudit.NewReassembler(maxInFlight, timeout, stream)
+	if err != nil {
+		t.Fatalf("new reassembler: %v", err)
+	}
+	return r, stream, rec, p
+}
+
+func pushRecords(t *testing.T, r *libaudit.Reassembler, records []auditRecord) {
+	t.Helper()
+	for _, rec := range records {
+		if err := r.Push(rec.msgType, []byte(rec.text)); err != nil {
+			t.Fatalf("push %v: %v", rec.msgType, err)
+		}
+	}
+}
+
+func syscallRecord(seq, syscallNr int, comm, exe, key string) auditRecord {
+	return auditRecord{auparse.AUDIT_SYSCALL, fmt.Sprintf(`audit(1700000000.000:%d): arch=c000003e syscall=%d success=yes exit=0 a0=3 a1=7f00 a2=10 a3=0 items=1 ppid=1 pid=%d auid=4294967295 uid=1001 gid=1001 euid=1001 suid=1001 fsuid=1001 egid=1001 sgid=1001 fsgid=1001 tty=(none) ses=4294967295 comm="%s" exe="%s" key="%s"`, seq, syscallNr, 100+seq, comm, exe, key)}
+}
+
+func proctitleRecord(seq int) auditRecord {
+	return auditRecord{auparse.AUDIT_PROCTITLE, fmt.Sprintf(`audit(1700000000.000:%d): proctitle=7465737400`, seq)}
+}
+
+func eoeRecord(seq int) auditRecord {
+	return auditRecord{auparse.AUDIT_EOE, fmt.Sprintf(`audit(1700000000.000:%d): `, seq)}
+}
+
+func TestReassemblyDispatchesDetectionsOnce(t *testing.T) {
 	tests := []struct {
 		name    string
 		records []auditRecord
-		check   func(*Event) bool
+		want    func(Event) bool
 	}{
 		{
-			name: "process start",
+			name: "connect",
 			records: []auditRecord{
-				{auparse.AUDIT_SYSCALL, `audit(1700000001.000:50): arch=c000003e syscall=59 success=yes exit=0 a0=55d0 a1=55d1 a2=55d2 a3=0 items=2 ppid=1 pid=200 auid=4294967295 uid=1001 gid=1001 euid=1001 suid=1001 fsuid=1001 egid=1001 sgid=1001 fsgid=1001 tty=(none) ses=4294967295 comm="ls" exe="/usr/bin/ls" key="procmon"`},
-				{auparse.AUDIT_EXECVE, `audit(1700000001.000:50): argc=2 a0="ls" a1="-l"`},
-				{auparse.AUDIT_CWD, `audit(1700000001.000:50): cwd="/home/runner/work"`},
-				{auparse.AUDIT_PATH, `audit(1700000001.000:50): item=0 name="/usr/bin/ls" inode=10 dev=08:01 mode=0100755 ouid=0 ogid=0 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0`},
-				{auparse.AUDIT_PROCTITLE, `audit(1700000001.000:50): proctitle=6C73002D6C`},
-				{auparse.AUDIT_EOE, `audit(1700000001.000:50): `},
+				syscallRecord(43, 42, "curl", "/usr/bin/curl", "netmon"),
+				// 192.0.2.10:443
+				{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:43): saddr=020001BBC000020A0000000000000000`},
+				proctitleRecord(43),
+				eoeRecord(43),
 			},
-			check: func(e *Event) bool {
-				return e.EventType == processMonitorTag && len(e.ProcessArguments) == 2 && e.Path == "/home/runner/work"
-			},
-		},
-		{
-			name: "file write",
-			records: []auditRecord{
-				{auparse.AUDIT_SYSCALL, `audit(1700000002.000:51): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=55d0 a2=241 a3=1b6 items=2 ppid=1 pid=201 auid=4294967295 uid=1001 gid=1001 euid=1001 suid=1001 fsuid=1001 egid=1001 sgid=1001 fsgid=1001 tty=(none) ses=4294967295 comm="bash" exe="/usr/bin/bash" key="filemon"`},
-				{auparse.AUDIT_CWD, `audit(1700000002.000:51): cwd="/home/runner/work/repo"`},
-				{auparse.AUDIT_PATH, `audit(1700000002.000:51): item=1 name="out.txt" inode=11 dev=08:01 mode=0100644 ouid=1001 ogid=1001 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0`},
-				{auparse.AUDIT_PROCTITLE, `audit(1700000002.000:51): proctitle=62617368`},
-				{auparse.AUDIT_EOE, `audit(1700000002.000:51): `},
-			},
-			check: func(e *Event) bool {
-				return e.EventType == fileMonitorTag && e.FileName == "out.txt" && e.Path == "/home/runner/work/repo"
+			want: func(e Event) bool {
+				return e.EventType == netMonitorTag && e.Syscall == "connect" && e.IPAddress == "192.0.2.10" && e.Port == "443" &&
+					e.Pid == "143" && e.PPid == "1" && e.Exe == "/usr/bin/curl" && e.Euid == "1001" && e.Status == "success" &&
+					e.Timestamp.Equal(time.Unix(1700000000, 0))
 			},
 		},
 		{
 			name: "sendto with an address",
 			records: []auditRecord{
-				{auparse.AUDIT_SYSCALL, `audit(1700000003.000:52): arch=c000003e syscall=44 success=yes exit=40 a0=5 a1=7f00 a2=28 a3=0 items=0 ppid=1 pid=202 auid=4294967295 uid=1001 gid=1001 euid=1001 suid=1001 fsuid=1001 egid=1001 sgid=1001 fsgid=1001 tty=(none) ses=4294967295 comm="dig" exe="/usr/bin/dig" key="netmon"`},
+				syscallRecord(52, 44, "dig", "/usr/bin/dig", "netmon"),
 				// 192.0.2.53:53
-				{auparse.AUDIT_SOCKADDR, `audit(1700000003.000:52): saddr=02000035C0000235000000000000000000`},
-				{auparse.AUDIT_PROCTITLE, `audit(1700000003.000:52): proctitle=646967`},
-				{auparse.AUDIT_EOE, `audit(1700000003.000:52): `},
+				{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:52): saddr=02000035C0000235000000000000000000`},
+				proctitleRecord(52),
+				eoeRecord(52),
 			},
-			check: func(e *Event) bool {
+			want: func(e Event) bool {
 				return e.EventType == netMonitorTag && e.IPAddress == "192.0.2.53" && e.Port == "53"
+			},
+		},
+		{
+			name: "process start",
+			records: []auditRecord{
+				syscallRecord(50, 59, "ls", "/usr/bin/ls", "procmon"),
+				{auparse.AUDIT_EXECVE, `audit(1700000000.000:50): argc=2 a0="ls" a1="-l"`},
+				{auparse.AUDIT_CWD, `audit(1700000000.000:50): cwd="/home/runner/work"`},
+				{auparse.AUDIT_PATH, `audit(1700000000.000:50): item=0 name="/usr/bin/ls" inode=10 dev=08:01 mode=0100755 ouid=0 ogid=0 rdev=00:00 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0`},
+				proctitleRecord(50),
+				eoeRecord(50),
+			},
+			want: func(e Event) bool {
+				return e.EventType == processMonitorTag && reflect.DeepEqual(e.ProcessArguments, []string{"ls", "-l"}) && e.Path == "/home/runner/work" &&
+					e.Pid == "150" && e.Exe == "/usr/bin/ls"
+			},
+		},
+		{
+			name: "file write",
+			records: []auditRecord{
+				syscallRecord(51, 257, "bash", "/usr/bin/bash", "filemon"),
+				{auparse.AUDIT_CWD, `audit(1700000000.000:51): cwd="/home/runner/work/repo"`},
+				{auparse.AUDIT_PATH, `audit(1700000000.000:51): item=1 name="out.txt" inode=11 dev=08:01 mode=0100644 ouid=1001 ogid=1001 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0`},
+				proctitleRecord(51),
+				eoeRecord(51),
+			},
+			want: func(e Event) bool {
+				return e.EventType == fileMonitorTag && e.FileName == "out.txt" && e.Path == "/home/runner/work/repo"
+			},
+		},
+		{
+			name: "connect over IPv6",
+			records: []auditRecord{
+				syscallRecord(54, 42, "curl", "/usr/bin/curl", "netmon"),
+				// [2001:db8::1]:443
+				{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:54): saddr=0A0001BB0000000020010DB800000000000000000000000100000000`},
+				proctitleRecord(54),
+				eoeRecord(54),
+			},
+			want: func(e Event) bool {
+				return e.EventType == netMonitorTag && e.IPAddress == "2001:db8::1" && e.Port == "443"
+			},
+		},
+		{
+			// rename has PARENT, DELETE and CREATE paths; the first qualifying one is kept
+			name: "rename keeps the source file",
+			records: []auditRecord{
+				syscallRecord(53, 82, "mv", "/usr/bin/mv", "filemon"),
+				{auparse.AUDIT_CWD, `audit(1700000000.000:53): cwd="/home/runner/work/repo"`},
+				{auparse.AUDIT_PATH, `audit(1700000000.000:53): item=0 name="/home/runner/work/repo" inode=5 dev=08:01 mode=040755 ouid=1001 ogid=1001 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0`},
+				{auparse.AUDIT_PATH, `audit(1700000000.000:53): item=1 name="/home/runner/work/repo" inode=5 dev=08:01 mode=040755 ouid=1001 ogid=1001 rdev=00:00 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0`},
+				{auparse.AUDIT_PATH, `audit(1700000000.000:53): item=2 name="Dockerfile" inode=12 dev=08:01 mode=0100644 ouid=1001 ogid=1001 rdev=00:00 nametype=DELETE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0`},
+				{auparse.AUDIT_PATH, `audit(1700000000.000:53): item=3 name="tmpfile" inode=12 dev=08:01 mode=0100644 ouid=1001 ogid=1001 rdev=00:00 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0`},
+				proctitleRecord(53),
+				eoeRecord(53),
+			},
+			want: func(e Event) bool {
+				return e.EventType == fileMonitorTag && e.FileName == "Dockerfile" && e.Path == "/home/runner/work/repo"
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &ProcessMonitor{Events: make(map[int]*Event)}
-			dispatched := feedRecords(t, p, tt.records)
-			if len(dispatched) != 1 {
-				t.Fatalf("expected one dispatch, got %d", len(dispatched))
+			r, _, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+			pushRecords(t, r, tt.records)
+
+			// delivered when the event completes, before any timeout or flush
+			got := rec.dispatched()
+			if len(got) != 1 {
+				t.Fatalf("expected one dispatch, got %d", len(got))
 			}
-			if !tt.check(dispatched[0]) {
-				t.Fatalf("unexpected dispatched event %+v", dispatched[0])
+			if !tt.want(got[0]) {
+				t.Fatalf("unexpected dispatched event %+v", got[0])
 			}
-			if len(p.Events) != 0 {
-				t.Fatalf("expected no pending events after EOE, got %d", len(p.Events))
+			r.Close()
+			if again := rec.dispatched(); len(again) != 1 {
+				t.Fatalf("the final flush must not dispatch again, got %d", len(again))
 			}
 		})
 	}
 }
 
-func TestPrepareEventDropsIdleEvents(t *testing.T) {
-	p := &ProcessMonitor{Events: make(map[int]*Event)}
-	part := map[string]interface{}{"tags": []string{"netmon"}, "syscall": "sendto"}
+func TestReassemblyDropsSendWithoutAddress(t *testing.T) {
+	r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
 
-	last := 5 * pendingEventWindow
-	for sequence := 1; sequence <= last; sequence++ {
-		p.PrepareEvent(sequence, part)
-	}
+	// send() on a connected socket: sendto with no SOCKADDR record
+	pushRecords(t, r, []auditRecord{syscallRecord(42, 44, "python3", "/usr/bin/python3.12", "netmon"), proctitleRecord(42), eoeRecord(42)})
 
-	if len(p.Events) > 2*pendingEventWindow+1 {
-		t.Fatalf("pending events not bounded: %d", len(p.Events))
+	if stream.delivered.Load() != 1 {
+		t.Fatalf("expected the event to be delivered once, got %d", stream.delivered.Load())
 	}
-	if p.droppedEvents == 0 {
-		t.Fatalf("expected dropped events to be counted")
-	}
-	if _, ok := p.Events[last]; !ok {
-		t.Fatalf("the newest event must be kept")
-	}
-	if _, ok := p.Events[1]; ok {
-		t.Fatalf("the oldest event should have been dropped")
+	if got := rec.dispatched(); len(got) != 0 {
+		t.Fatalf("a send without an address must not be dispatched, got %+v", got)
 	}
 }
 
-func TestPrepareEventKeepsActiveEventsDuringSweep(t *testing.T) {
-	p := &ProcessMonitor{Events: make(map[int]*Event)}
-	p.PrepareEvent(1, map[string]interface{}{"tags": []string{"netmon"}, "syscall": "connect"})
+func TestReassemblyDoesNotKeepIncompleteEvents(t *testing.T) {
+	r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
 
-	idle := map[string]interface{}{"tags": []string{"netmon"}, "syscall": "sendto"}
-	for sequence := 2; sequence <= 2+4*pendingEventWindow; sequence++ {
-		p.PrepareEvent(sequence, idle)
-		if sequence%1000 == 0 {
-			// sequence 1 keeps receiving records, so it is never idle
-			p.PrepareEvent(1, map[string]interface{}{})
+	// records that never complete (no PROCTITLE or EOE) must not pile up
+	const events = 10000
+	for seq := 1; seq <= events; seq++ {
+		pushRecords(t, r, []auditRecord{syscallRecord(seq, 44, "python3", "/usr/bin/python3.12", "netmon")})
+	}
+
+	// 50 is Auditbeat's default; compared as a literal so a change to the limit is caught
+	if inFlight := events - stream.delivered.Load(); inFlight > 50 {
+		t.Fatalf("expected at most 50 events in flight, got %d", inFlight)
+	}
+	if got := rec.dispatched(); len(got) != 0 {
+		t.Fatalf("incomplete sends must not be dispatched, got %d", len(got))
+	}
+}
+
+func TestReassemblyGivesUpOnEventsAfterTimeout(t *testing.T) {
+	r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, 50*time.Millisecond)
+
+	// a connect whose last records never arrive
+	pushRecords(t, r, []auditRecord{
+		syscallRecord(60, 42, "curl", "/usr/bin/curl", "netmon"),
+		{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:60): saddr=020001BBC000020A0000000000000000`},
+	})
+	if stream.delivered.Load() != 0 {
+		t.Fatalf("event delivered before it completed or timed out")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	if err := r.Maintain(); err != nil {
+		t.Fatalf("maintain: %v", err)
+	}
+
+	if stream.delivered.Load() != 1 {
+		t.Fatalf("expected the timed out event to be delivered, got %d", stream.delivered.Load())
+	}
+	if got := rec.dispatched(); len(got) != 1 || got[0].IPAddress != "192.0.2.10" {
+		t.Fatalf("expected the connect to be dispatched with what arrived, got %+v", got)
+	}
+}
+
+func TestReassemblyCountsLostEvents(t *testing.T) {
+	r, _, _, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+
+	// sequences 71 to 74 never arrive
+	pushRecords(t, r, []auditRecord{syscallRecord(70, 42, "curl", "/usr/bin/curl", "netmon"), proctitleRecord(70)})
+	pushRecords(t, r, []auditRecord{syscallRecord(75, 42, "curl", "/usr/bin/curl", "netmon"), proctitleRecord(75)})
+
+	if got := p.sequenceGaps.Load(); got != 4 {
+		t.Fatalf("expected a gap of 4, got %d", got)
+	}
+}
+
+func TestEventsLostIgnoresImpossibleGaps(t *testing.T) {
+	p := &ProcessMonitor{}
+	stream := &auditStream{monitor: p, dispatch: func(*Event) {}}
+
+	// what go-libaudit v2.3.2 reports when a record arrives after its event was given up
+	stream.EventsLost(int(^uint32(0)))
+	stream.EventsLost(0)
+	if got := p.sequenceGaps.Load(); got != 0 {
+		t.Fatalf("impossible gaps must be ignored, got %d", got)
+	}
+
+	stream.EventsLost(3)
+	if got := p.sequenceGaps.Load(); got != 3 {
+		t.Fatalf("expected a gap of 3, got %d", got)
+	}
+}
+
+func TestReassemblyCountsRecordFieldErrors(t *testing.T) {
+	r, _, rec, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+
+	// a valid header with an address that cannot be decoded
+	pushRecords(t, r, []auditRecord{
+		syscallRecord(90, 42, "curl", "/usr/bin/curl", "netmon"),
+		{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:90): saddr=ZZZZ`},
+		proctitleRecord(90),
+	})
+
+	if got := p.recordErrors.Load(); got != 1 {
+		t.Fatalf("expected one record with unparsed fields, got %d", got)
+	}
+	if got := rec.dispatched(); len(got) != 0 {
+		t.Fatalf("a connect without an address must not be dispatched, got %+v", got)
+	}
+}
+
+func TestReassemblyHandlesShortSocketAddresses(t *testing.T) {
+	// go-libaudit before v2.6.0 panicked on these (elastic/go-libaudit#152)
+	// too short for the family, for AF_INET and for AF_INET6
+	for _, saddr := range []string{"ZZ", "02", "", "0200", "02000050", "0A00", "0A0001BB"} {
+		t.Run(fmt.Sprintf("saddr=%q", saddr), func(t *testing.T) {
+			r, _, rec, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+			pushRecords(t, r, []auditRecord{
+				syscallRecord(91, 42, "curl", "/usr/bin/curl", "netmon"),
+				{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:91): saddr=` + saddr},
+				proctitleRecord(91),
+			})
+			if got := rec.dispatched(); len(got) != 0 {
+				t.Fatalf("a connect without a usable address must not be dispatched, got %+v", got)
+			}
+			if got := p.recordErrors.Load(); got != 1 {
+				t.Fatalf("expected the record to be counted as not parsed, got %d", got)
+			}
+		})
+	}
+}
+
+func TestNoteLossLogsOnPowersOfTwo(t *testing.T) {
+	var counter atomic.Int64
+	var logged []int64
+	for i := 0; i < 20; i++ {
+		if noteLoss(&counter, 1, "test") {
+			logged = append(logged, counter.Load())
 		}
 	}
-
-	if p.droppedEvents == 0 {
-		t.Fatalf("expected the sweep to run")
+	want := []int64{1, 2, 4, 8, 16}
+	if fmt.Sprint(logged) != fmt.Sprint(want) {
+		t.Fatalf("logged at %v, want %v", logged, want)
 	}
-	event, ok := p.Events[1]
-	if !ok || event.EventType != netMonitorTag || event.Syscall != "connect" {
-		t.Fatalf("an active event lost its data: %+v", event)
+
+	// a batch that crosses a power of two logs once
+	if !noteLoss(&counter, 20, "test") {
+		t.Fatalf("expected a log when the total goes from 20 to 40")
 	}
 }
 
-func TestPrepareEventLateRecordWhileSweeping(t *testing.T) {
-	p := &ProcessMonitor{Events: make(map[int]*Event)}
-	idle := map[string]interface{}{"tags": []string{"netmon"}, "syscall": "sendto"}
-	for sequence := 2; sequence <= 2*pendingEventWindow+1; sequence++ {
-		p.PrepareEvent(sequence, idle)
-	}
-
-	// a late record for an unknown sequence triggers the sweep while it is prepared
-	event := p.PrepareEvent(1, map[string]interface{}{"addr": "192.0.2.10", "port": "443"})
-	if p.droppedEvents == 0 {
-		t.Fatalf("expected the sweep to run")
-	}
-	if event == nil || event.IPAddress != "192.0.2.10" || p.Events[1] != event {
-		t.Fatalf("the event being prepared must survive the sweep, got %+v", event)
-	}
-}
-
-func TestPrepareEventLosesEventCompletedAfterEviction(t *testing.T) {
-	p := &ProcessMonitor{Events: make(map[int]*Event)}
-	p.PrepareEvent(1, map[string]interface{}{"tags": []string{"netmon"}, "syscall": "connect"})
-
-	idle := map[string]interface{}{"tags": []string{"netmon"}, "syscall": "sendto"}
-	for sequence := 2; sequence <= 2+3*pendingEventWindow; sequence++ {
-		p.PrepareEvent(sequence, idle)
-	}
-	if _, ok := p.Events[1]; ok {
-		t.Fatalf("an event idle for longer than the window should be dropped")
-	}
-
-	// documented trade-off: the late address alone does not make the event ready
-	event := p.PrepareEvent(1, map[string]interface{}{"addr": "192.0.2.10", "port": "443"})
-	if isEventReady(event) {
-		t.Fatalf("a recreated event without its syscall record must not be dispatched: %+v", event)
-	}
-}
-
-func TestIsReceiveOverflow(t *testing.T) {
+func TestNoteReceiveError(t *testing.T) {
 	cases := []struct {
-		err  error
-		want bool
+		err          error
+		wantOverflow int64
+		wantOther    int64
 	}{
-		{syscall.ENOBUFS, true},
-		{os.NewSyscallError("recvfrom", syscall.ENOBUFS), true},
-		{fmt.Errorf("receive: %w", syscall.ENOBUFS), true},
-		{syscall.EBADF, false},
-		{errors.New("no buffer space available"), false},
+		{syscall.ENOBUFS, 1, 0},
+		{os.NewSyscallError("recvfrom", syscall.ENOBUFS), 1, 0},
+		{fmt.Errorf("receive: %w", syscall.ENOBUFS), 1, 0},
+		{syscall.EINVAL, 0, 1},
+		{errors.New("no buffer space available"), 0, 1},
 	}
 	for _, c := range cases {
-		if got := isReceiveOverflow(c.err); got != c.want {
-			t.Errorf("isReceiveOverflow(%v) = %v, want %v", c.err, got, c.want)
+		p := &ProcessMonitor{}
+		p.noteReceiveError(c.err)
+		if p.receiveOverflow.Load() != c.wantOverflow || p.receiveErrors.Load() != c.wantOther {
+			t.Errorf("noteReceiveError(%v): overflow=%d other=%d, want %d %d", c.err, p.receiveOverflow.Load(), p.receiveErrors.Load(), c.wantOverflow, c.wantOther)
 		}
 	}
 }
