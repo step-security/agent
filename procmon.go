@@ -27,6 +27,15 @@ const (
 	reassemblerMaintain    = 500 * time.Millisecond
 )
 
+// Kernel audit queue settings, from Auditbeat's defaults. The kernel's own
+// defaults (64 records, 60 second wait) make audited syscalls sleep whenever
+// the agent falls behind, which slows the job instead of dropping records.
+const (
+	auditBacklogLimit       = 8192
+	auditFallbackRateLimit  = 5000 // only when the wait time cannot be set to 0
+	kernelLostCheckInterval = 15 * time.Second
+)
+
 type ProcessMonitor struct {
 	CorrelationId         string
 	Repo                  string
@@ -43,6 +52,7 @@ type ProcessMonitor struct {
 	receiveErrors   atomic.Int64
 	invalidRecords  atomic.Int64
 	recordErrors    atomic.Int64
+	kernelLost      atomic.Int64
 }
 
 type Process struct {

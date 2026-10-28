@@ -251,3 +251,132 @@ func TestReceiveWaitsForMaintenanceBeforeReturning(t *testing.T) {
 		t.Fatalf("receive should stop when the client is closed, got %v", err)
 	}
 }
+
+// fakeQueueControl records the kernel queue settings it is asked to change.
+type fakeQueueControl struct {
+	calls []string
+	err   error
+}
+
+func (f *fakeQueueControl) SetFailure(fm libaudit.FailureMode, _ libaudit.WaitMode) error {
+	f.calls = append(f.calls, fmt.Sprintf("failure=%d", fm))
+	return f.err
+}
+
+func (f *fakeQueueControl) SetBacklogLimit(limit uint32, _ libaudit.WaitMode) error {
+	f.calls = append(f.calls, fmt.Sprintf("backlog_limit=%d", limit))
+	return f.err
+}
+
+func (f *fakeQueueControl) SetBacklogWaitTime(waitTime int32, _ libaudit.WaitMode) error {
+	f.calls = append(f.calls, fmt.Sprintf("backlog_wait_time=%d", waitTime))
+	return f.err
+}
+
+func (f *fakeQueueControl) SetRateLimit(limit uint32, _ libaudit.WaitMode) error {
+	f.calls = append(f.calls, fmt.Sprintf("rate_limit=%d", limit))
+	return f.err
+}
+
+func Test_configureBackpressure(t *testing.T) {
+	const waitTimeSupported = libaudit.AuditFeatureBitmapBacklogWaitTime
+	cases := []struct {
+		name   string
+		status libaudit.AuditStatus
+		want   []string
+	}{
+		{
+			name:   "kernel defaults with wait time support",
+			status: libaudit.AuditStatus{Enabled: 1, Failure: 1, BacklogLimit: 64, BacklogWaitTime: 60000, FeatureBitmap: waitTimeSupported},
+			want:   []string{"failure=0", "backlog_limit=8192", "backlog_wait_time=0"},
+		},
+		{
+			name:   "panic failure mode is made silent before dropping",
+			status: libaudit.AuditStatus{Enabled: 1, Failure: 2, BacklogLimit: 8192, FeatureBitmap: waitTimeSupported},
+			want:   []string{"failure=0", "backlog_wait_time=0"},
+		},
+		{
+			name:   "no wait time support falls back to a rate limit",
+			status: libaudit.AuditStatus{Enabled: 1, BacklogLimit: 64},
+			want:   []string{"backlog_limit=8192", "rate_limit=5000"},
+		},
+		{
+			name:   "existing rate limit is cleared when wait time is supported",
+			status: libaudit.AuditStatus{Enabled: 1, BacklogLimit: 8192, RateLimit: 100, FeatureBitmap: waitTimeSupported},
+			want:   []string{"backlog_wait_time=0", "rate_limit=0"},
+		},
+		{
+			name:   "fallback already applied",
+			status: libaudit.AuditStatus{Enabled: 1, BacklogLimit: 8192, RateLimit: 5000},
+			want:   nil,
+		},
+		{
+			name:   "locked audit config is left alone",
+			status: libaudit.AuditStatus{Enabled: 2, BacklogLimit: 64, FeatureBitmap: waitTimeSupported},
+			want:   nil,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := &fakeQueueControl{}
+			status := c.status
+			if err := configureBackpressure(f, &status); err != nil {
+				t.Fatalf("configureBackpressure() error = %v", err)
+			}
+			if fmt.Sprint(f.calls) != fmt.Sprint(c.want) {
+				t.Errorf("calls = %v, want %v", f.calls, c.want)
+			}
+		})
+	}
+}
+
+func Test_configureBackpressure_error(t *testing.T) {
+	f := &fakeQueueControl{err: errors.New("EPERM")}
+	status := libaudit.AuditStatus{Enabled: 1, Failure: 2, BacklogLimit: 64, FeatureBitmap: libaudit.AuditFeatureBitmapBacklogWaitTime}
+	if err := configureBackpressure(f, &status); err == nil {
+		t.Fatal("configureBackpressure() error = nil, want error")
+	}
+	if len(f.calls) != 1 {
+		t.Errorf("calls = %v, want to stop before any drop setting", f.calls)
+	}
+}
+
+func Test_noteKernelLost(t *testing.T) {
+	p := &ProcessMonitor{}
+	steps := []struct {
+		current   uint32
+		wantTotal int64
+	}{
+		{10, 0},  // first reading after start: 10 were lost before the agent
+		{10, 0},  // nothing new
+		{25, 15}, // 15 new
+		{3, 18},  // counter was reset, 3 new since the reset
+		{3, 18},
+	}
+	last := uint32(10)
+	for i, s := range steps {
+		last = p.noteKernelLost(last, s.current)
+		if last != s.current {
+			t.Errorf("step %d: returned %d, want %d", i, last, s.current)
+		}
+		if got := p.kernelLost.Load(); got != s.wantTotal {
+			t.Errorf("step %d: kernelLost = %d, want %d", i, got, s.wantTotal)
+		}
+	}
+}
+
+func Test_monitorKernelLost_stops(t *testing.T) {
+	p := &ProcessMonitor{}
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	go func() {
+		p.monitorKernelLost(0, done)
+		close(stopped)
+	}()
+	close(done)
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("monitorKernelLost did not stop after done was closed")
+	}
+}

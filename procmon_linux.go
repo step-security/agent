@@ -38,6 +38,13 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 		errc <- errors.Wrap(err, "failed to get audit client status")
 	}
 
+	if err = configureBackpressure(client, status); err != nil {
+		WriteLog(fmt.Sprintf("[procmon] failed to configure audit backlog: %v", err))
+	}
+	stopLostCheck := make(chan struct{})
+	defer close(stopLostCheck)
+	go p.monitorKernelLost(status.Lost, stopLostCheck)
+
 	if status.Enabled == 0 {
 		if err = client.SetEnabled(true, libaudit.WaitForReply); err != nil {
 			errc <- errors.Wrap(err, "failed to set audit client")
@@ -157,6 +164,103 @@ func (p *ProcessMonitor) MonitorProcesses(errc chan error) {
 	if err := p.receive(client); err != nil {
 		WriteLog(fmt.Sprintf("[procmon] receive stopped: %v", err))
 	}
+}
+
+// auditQueueControl is the part of the audit client that sets the kernel queue.
+type auditQueueControl interface {
+	SetFailure(fm libaudit.FailureMode, wm libaudit.WaitMode) error
+	SetBacklogLimit(limit uint32, wm libaudit.WaitMode) error
+	SetBacklogWaitTime(waitTime int32, wm libaudit.WaitMode) error
+	SetRateLimit(perSecondLimit uint32, wm libaudit.WaitMode) error
+}
+
+// configureBackpressure follows Auditbeat's default "auto" strategy: raise the
+// backlog limit and have the kernel drop records immediately when the queue is
+// full, instead of making the audited syscall wait. Kernels that cannot set the
+// wait time get a rate limit instead. The failure mode is set to silent first,
+// as Auditbeat does, so a dropped record never panics the kernel.
+func configureBackpressure(c auditQueueControl, status *libaudit.AuditStatus) error {
+	if status.Enabled == 2 { // locked, changes are rejected
+		return nil
+	}
+
+	if status.Failure != uint32(libaudit.SilentOnFailure) {
+		if err := c.SetFailure(libaudit.SilentOnFailure, libaudit.WaitForReply); err != nil {
+			return errors.Wrap(err, "set failure mode")
+		}
+	}
+
+	if status.BacklogLimit != auditBacklogLimit {
+		if err := c.SetBacklogLimit(auditBacklogLimit, libaudit.WaitForReply); err != nil {
+			return errors.Wrap(err, "set backlog limit")
+		}
+	}
+
+	var rateLimit uint32
+	if status.FeatureBitmap&libaudit.AuditFeatureBitmapBacklogWaitTime != 0 {
+		if err := c.SetBacklogWaitTime(0, libaudit.WaitForReply); err != nil {
+			return errors.Wrap(err, "set backlog wait time")
+		}
+	} else {
+		rateLimit = auditFallbackRateLimit
+	}
+
+	if status.RateLimit != rateLimit {
+		if err := c.SetRateLimit(rateLimit, libaudit.WaitForReply); err != nil {
+			return errors.Wrap(err, "set rate limit")
+		}
+	}
+
+	WriteLog(fmt.Sprintf("[procmon] audit backlog limit %d, wait time 0: %t, rate limit %d", auditBacklogLimit, rateLimit == 0, rateLimit))
+	return nil
+}
+
+// monitorKernelLost polls the kernel's lost record counter on its own
+// connection, as Auditbeat does, so dropped records show up in the log. It
+// stops when done is closed.
+func (p *ProcessMonitor) monitorKernelLost(lost uint32, done <-chan struct{}) {
+	var client *libaudit.AuditClient
+	defer func() {
+		if client != nil {
+			client.Close()
+		}
+	}()
+	ticker := time.NewTicker(kernelLostCheckInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+		}
+		if client == nil {
+			c, err := libaudit.NewAuditClient(nil)
+			if err != nil {
+				continue
+			}
+			client = c
+		}
+		status, err := client.GetStatus()
+		if err != nil {
+			client.Close()
+			client = nil
+			continue
+		}
+		lost = p.noteKernelLost(lost, status.Lost)
+	}
+}
+
+// noteKernelLost counts records the kernel dropped since the last check and
+// returns the new reading. A smaller reading means the counter was reset.
+func (p *ProcessMonitor) noteKernelLost(last, current uint32) uint32 {
+	delta := current
+	if current >= last {
+		delta = current - last
+	}
+	if delta > 0 {
+		noteLoss(&p.kernelLost, int64(delta), "kernel reported lost audit records")
+	}
+	return current
 }
 
 func fileMonitorAuditRule(workingDirectory, goarch string) string {
