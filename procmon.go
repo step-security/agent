@@ -151,6 +151,9 @@ type auditStream struct {
 }
 
 func (s *auditStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
+	if !hasDetectionRecord(msgs) {
+		return
+	}
 	event := &Event{}
 	for _, msg := range msgs {
 		eventMap := msg.ToMapStr()
@@ -162,6 +165,23 @@ func (s *auditStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
 	if isEventReady(event) {
 		s.dispatch(event)
 	}
+}
+
+// hasDetectionRecord reports whether an event has a record other than SYSCALL,
+// PROCTITLE and EOE. A detection's address, path, working directory and
+// arguments come from the SOCKADDR, PATH, CWD and EXECVE records, so an event
+// made only of those three is not parsed. Most events on a busy runner are of
+// this kind: a send on a connected socket has no SOCKADDR record. Field errors
+// in skipped events are not counted.
+func hasDetectionRecord(msgs []*auparse.AuditMessage) bool {
+	for _, msg := range msgs {
+		switch msg.RecordType {
+		case auparse.AUDIT_SYSCALL, auparse.AUDIT_PROCTITLE, auparse.AUDIT_EOE:
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 // EventsLost is called for gaps in the audit sequence numbers. A gap is not
