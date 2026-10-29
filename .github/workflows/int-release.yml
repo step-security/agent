@@ -1,0 +1,134 @@
+name: INT Release
+
+# Publishes int builds of the agent to GHCR as an OCI artifact, so they can be
+# pulled and tested without a release.
+#
+#   push to int                   -> ghcr.io/step-security/agent/agent-int:latest and :<sha>
+#   manual run on a branch        -> ghcr.io/step-security/agent/agent-int:dev-<branch> and :<sha>
+#   PR to int titled "debug..."   -> ghcr.io/step-security/agent/agent-int:pr-<number> and :<sha>
+#
+# Each artifact holds agent_linux_amd64.tar.gz, agent_linux_arm64.tar.gz and
+# checksums.txt. Pull it with: oras pull ghcr.io/step-security/agent/agent-int:latest
+
+on:
+  push:
+    branches:
+      - int
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - int
+
+permissions: read-all
+
+env:
+  GOPRIVATE: github.com/step-security
+  IMAGE: ghcr.io/step-security/agent/agent-int
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (startsWith(github.event.pull_request.title, 'debug') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@629c2de402a417ea7690ca6ce3f33229e27606a5
+      - name: Set up Go
+        uses: actions/setup-go@424fc82d43fa5a37540bae62709ddcc23d9520d4
+        with:
+          go-version: 1.27.3
+
+      - name: Configure .netrc
+        run: |
+          printf "machine github.com login stepsecurity-infra-bot password ${{ secrets.PAT }}" >>~/.netrc
+
+      - name: Create go vendor dir
+        run: |
+          go mod vendor
+
+      - uses: goreleaser/goreleaser-action@5df302e5e9e4c66310a6b6493a8865b12c555af2
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --snapshot --clean --config releasers/int.yml
+
+      - name: Prepare artifact
+        run: |
+          mkdir upload
+          cp dist/agent_*_linux_amd64.tar.gz upload/agent_linux_amd64.tar.gz
+          cp dist/agent_*_linux_arm64.tar.gz upload/agent_linux_arm64.tar.gz
+          cd upload
+          sha256sum agent_linux_amd64.tar.gz agent_linux_arm64.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Pick tags
+        id: tags
+        env:
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.ref_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          case "$EVENT" in
+            push) name="latest" ;;
+            pull_request) name="pr-${PR_NUMBER}" ;;
+            *)
+              # Tags allow only [A-Za-z0-9_.-] and up to 128 characters.
+              name="dev-$(printf '%s' "$BRANCH" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-100)"
+              ;;
+          esac
+          echo "tags=${name},${SHA}" >> "$GITHUB_OUTPUT"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
+
+      - name: Push to GHCR
+        working-directory: upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          TAGS: ${{ steps.tags.outputs.tags }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          echo "$GITHUB_TOKEN" | oras login ghcr.io -u "$ACTOR" --password-stdin
+          oras push "${IMAGE}:${TAGS}" \
+            --artifact-type application/vnd.stepsecurity.agent.v1 \
+            --annotation "org.opencontainers.image.source=${SOURCE}" \
+            --annotation "org.opencontainers.image.revision=${REVISION}" \
+            --annotation "org.opencontainers.image.description=StepSecurity agent int build" \
+            agent_linux_amd64.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip \
+            agent_linux_arm64.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip \
+            checksums.txt:text/plain
+
+      - name: Summary
+        env:
+          NAME: ${{ steps.tags.outputs.name }}
+          REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          {
+            echo "### Published ${IMAGE}:${NAME}"
+            echo
+            echo "Commit: \`${REVISION}\` (also tagged \`${IMAGE}:${REVISION}\`)"
+            echo
+            echo '```'
+            echo "oras pull ${IMAGE}:${NAME}"
+            echo "sha256sum -c checksums.txt"
+            echo '```'
+            echo
+            echo '```'
+            cat upload/checksums.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
