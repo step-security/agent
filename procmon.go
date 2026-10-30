@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"math/bits"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/elastic/go-libaudit/v2"
 	"github.com/elastic/go-libaudit/v2/auparse"
 )
 
@@ -148,9 +150,67 @@ func getValue(key string, eventMap map[string]interface{}) string {
 type auditStream struct {
 	monitor  *ProcessMonitor
 	dispatch func(*Event)
+
+	// ops serializes push with maintain and flush, so an event cannot be
+	// given up between a record being admitted and being pushed
+	ops sync.Mutex
+
+	// syscallEvents holds the sequence numbers of the events in the
+	// reassembler, which all start with a SYSCALL record (see push)
+	mu            sync.Mutex
+	syscallEvents map[uint32]struct{}
+}
+
+// push passes a record to the reassembler if it belongs to an audited
+// syscall. The records the agent uses (EXECVE, SOCKADDR, CWD, PATH,
+// PROCTITLE) follow the event's SYSCALL record. Other records, such as BPF or
+// ANOM_PROMISCUOUS, can arrive alone without the records that complete an
+// event, and since the reassembler delivers events in sequence order, each
+// one would hold back every later event until it times out.
+func (s *auditStream) push(r *libaudit.Reassembler, msg *auparse.AuditMessage) {
+	s.ops.Lock()
+	defer s.ops.Unlock()
+
+	s.mu.Lock()
+	if s.syscallEvents == nil {
+		s.syscallEvents = make(map[uint32]struct{})
+	}
+	_, found := s.syscallEvents[msg.Sequence]
+	if !found && msg.RecordType == auparse.AUDIT_SYSCALL {
+		s.syscallEvents[msg.Sequence] = struct{}{}
+		found = true
+	}
+	s.mu.Unlock()
+
+	if found {
+		r.PushMessage(msg)
+	}
+}
+
+// maintain gives up on events whose last record did not arrive in time.
+func (s *auditStream) maintain(r *libaudit.Reassembler) error {
+	s.ops.Lock()
+	defer s.ops.Unlock()
+	return r.Maintain()
+}
+
+// flush delivers the events still in the reassembler and closes it.
+func (s *auditStream) flush(r *libaudit.Reassembler) {
+	s.ops.Lock()
+	defer s.ops.Unlock()
+	r.Close()
 }
 
 func (s *auditStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
+	if len(msgs) == 0 {
+		return
+	}
+	// records that arrive after this, such as the EOE after a PROCTITLE,
+	// are not passed on
+	s.mu.Lock()
+	delete(s.syscallEvents, msgs[0].Sequence)
+	s.mu.Unlock()
+
 	event := &Event{}
 	for _, msg := range msgs {
 		eventMap := msg.ToMapStr()
@@ -165,7 +225,7 @@ func (s *auditStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
 }
 
 // EventsLost is called for gaps in the audit sequence numbers. A gap is not
-// always a loss, since record types this agent skips use sequence numbers too.
+// always a loss, since events this agent skips use sequence numbers too.
 func (s *auditStream) EventsLost(count int) {
 	// go-libaudit v2.3.2 underflows when a record arrives after its event was
 	// given up, which shows up as a huge count

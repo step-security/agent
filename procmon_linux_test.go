@@ -251,3 +251,34 @@ func TestReceiveWaitsForMaintenanceBeforeReturning(t *testing.T) {
 		t.Fatalf("receive should stop when the client is closed, got %v", err)
 	}
 }
+
+func TestReceiveDoesNotHoldEventsBehindRecordsOutsideSyscalls(t *testing.T) {
+	release := make(chan struct{})
+	netlink := &fakeNetlink{steps: []fakeNetlinkStep{
+		// logged on its own, with no record that completes it
+		{msgType: auparse.AUDIT_BPF, text: `audit(1700000000.123:96): prog-id=12 op=UNLOAD`},
+		{msgType: auparse.AUDIT_SYSCALL, text: `audit(1700000000.123:97): arch=c000003e syscall=42 success=yes exit=0 a0=3 a1=7ffd a2=10 a3=0 items=0 ppid=1 pid=97 auid=4294967295 uid=1001 gid=1001 euid=1001 suid=1001 fsuid=1001 egid=1001 sgid=1001 fsgid=1001 tty=(none) ses=4294967295 comm="curl" exe="/usr/bin/curl" key="netmon"`},
+		{msgType: auparse.AUDIT_SOCKADDR, text: `audit(1700000000.123:97): saddr=020001BBC000020A0000000000000000`},
+		{msgType: auparse.AUDIT_PROCTITLE, text: `audit(1700000000.123:97): proctitle=6375726C`},
+		{block: release},
+	}}
+	dispatched := make(chan *Event, 1)
+	p := &ProcessMonitor{dispatchEvent: func(e *Event) { dispatched <- e }}
+
+	result := make(chan error, 1)
+	go func() { result <- p.receive(&libaudit.AuditClient{Netlink: netlink}) }()
+
+	select {
+	case e := <-dispatched:
+		if e.IPAddress != "192.0.2.10" {
+			t.Fatalf("unexpected event %+v", e)
+		}
+	case <-time.After(reassemblerTimeout / 2):
+		t.Fatalf("the connect was held behind the BPF record")
+	}
+
+	close(release)
+	if err := <-result; !errors.Is(err, syscall.EBADF) {
+		t.Fatalf("receive should stop when the client is closed, got %v", err)
+	}
+}
