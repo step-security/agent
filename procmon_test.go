@@ -83,12 +83,15 @@ func newTestReassembler(t *testing.T, maxInFlight int, timeout time.Duration) (*
 	return r, stream, rec, p
 }
 
-func pushRecords(t *testing.T, r *libaudit.Reassembler, records []auditRecord) {
+// pushRecords passes records to the reassembler the way receive does.
+func pushRecords(t *testing.T, r *libaudit.Reassembler, stream *countingStream, records []auditRecord) {
 	t.Helper()
 	for _, rec := range records {
-		if err := r.Push(rec.msgType, []byte(rec.text)); err != nil {
-			t.Fatalf("push %v: %v", rec.msgType, err)
+		msg, err := auparse.Parse(rec.msgType, rec.text)
+		if err != nil {
+			t.Fatalf("parse %v: %v", rec.msgType, err)
 		}
+		stream.push(r, msg)
 	}
 }
 
@@ -200,8 +203,8 @@ func TestReassemblyDispatchesDetectionsOnce(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
-			pushRecords(t, r, tt.records)
+			r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+			pushRecords(t, r, stream, tt.records)
 
 			// delivered when the event completes, before any timeout or flush
 			got := rec.dispatched()
@@ -219,11 +222,183 @@ func TestReassemblyDispatchesDetectionsOnce(t *testing.T) {
 	}
 }
 
+func TestReassemblySkipsRecordsOutsideSyscallEvents(t *testing.T) {
+	r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+
+	pushRecords(t, r, stream, []auditRecord{
+		// a BPF program unload, logged on its own, with no record that completes it
+		{auparse.AUDIT_BPF, `audit(1700000000.000:30): prog-id=12 op=UNLOAD`},
+		// a BPF record logged during an audited syscall, before its SYSCALL record
+		{auparse.AUDIT_BPF, `audit(1700000000.000:31): prog-id=13 op=LOAD`},
+		syscallRecord(31, 42, "curl", "/usr/bin/curl", "netmon"),
+		{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:31): saddr=020001BBC000020A0000000000000000`},
+		proctitleRecord(31),
+		eoeRecord(31),
+		syscallRecord(32, 59, "ls", "/usr/bin/ls", "procmon"),
+		{auparse.AUDIT_EXECVE, `audit(1700000000.000:32): argc=1 a0="ls"`},
+		{auparse.AUDIT_CWD, `audit(1700000000.000:32): cwd="/home/runner/work"`},
+		proctitleRecord(32),
+		eoeRecord(32),
+	})
+
+	// both are delivered as they complete, not held behind the BPF record
+	got := rec.dispatched()
+	if len(got) != 2 || got[0].IPAddress != "192.0.2.10" || got[1].Exe != "/usr/bin/ls" {
+		t.Fatalf("expected the connect and the process start right away, got %+v", got)
+	}
+	if delivered := stream.delivered.Load(); delivered != 2 {
+		t.Fatalf("records outside syscall events must not reach the reassembler, %d events delivered", delivered)
+	}
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+	if len(stream.syscallEvents) != 0 {
+		t.Fatalf("delivered events must be forgotten, %d left", len(stream.syscallEvents))
+	}
+}
+
+func TestReassemblyCompletesOnEOEWithoutProctitle(t *testing.T) {
+	r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+
+	pushRecords(t, r, stream, []auditRecord{
+		syscallRecord(34, 42, "curl", "/usr/bin/curl", "netmon"),
+		{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:34): saddr=020001BBC000020A0000000000000000`},
+		eoeRecord(34),
+	})
+
+	if got := rec.dispatched(); len(got) != 1 || got[0].IPAddress != "192.0.2.10" {
+		t.Fatalf("expected the connect to be dispatched on its EOE, got %+v", got)
+	}
+}
+
+func TestReassemblyDropsRecordsAfterTheEventIsDelivered(t *testing.T) {
+	r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, 50*time.Millisecond)
+
+	// a connect given up before its last records arrive
+	pushRecords(t, r, stream, []auditRecord{
+		syscallRecord(33, 42, "curl", "/usr/bin/curl", "netmon"),
+		{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:33): saddr=020001BBC000020A0000000000000000`},
+	})
+	time.Sleep(100 * time.Millisecond)
+	if err := r.Maintain(); err != nil {
+		t.Fatalf("maintain: %v", err)
+	}
+	pushRecords(t, r, stream, []auditRecord{proctitleRecord(33), eoeRecord(33)})
+	r.Close()
+
+	if delivered := stream.delivered.Load(); delivered != 1 {
+		t.Fatalf("late records must not start a new event, %d events delivered", delivered)
+	}
+	if got := rec.dispatched(); len(got) != 1 {
+		t.Fatalf("expected the connect to be dispatched once, got %+v", got)
+	}
+}
+
+// blockingStream holds the delivery of one event until released.
+type blockingStream struct {
+	*auditStream
+	seq      uint32
+	entered  chan struct{}
+	release  chan struct{}
+	enterOne sync.Once
+}
+
+func (b *blockingStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
+	if msgs[0].Sequence == b.seq {
+		b.enterOne.Do(func() { close(b.entered) })
+		<-b.release
+	}
+	b.auditStream.ReassemblyComplete(msgs)
+}
+
+func TestLateRecordWaitsForTheEventToBeGivenUp(t *testing.T) {
+	rec := &recordingDispatch{}
+	stream := &auditStream{monitor: &ProcessMonitor{}, dispatch: rec.dispatch}
+	blocking := &blockingStream{auditStream: stream, seq: 40, entered: make(chan struct{}), release: make(chan struct{})}
+	r, err := libaudit.NewReassembler(reassemblerMaxInFlight, 50*time.Millisecond, blocking)
+	if err != nil {
+		t.Fatalf("new reassembler: %v", err)
+	}
+	push := func(records ...auditRecord) {
+		for _, record := range records {
+			msg, err := auparse.Parse(record.msgType, record.text)
+			if err != nil {
+				t.Errorf("parse %v: %v", record.msgType, err)
+				return
+			}
+			stream.push(r, msg)
+		}
+	}
+
+	var releaseOnce sync.Once
+	releaseCallback := func() { releaseOnce.Do(func() { close(blocking.release) }) }
+	maintained := make(chan struct{})
+	t.Cleanup(func() {
+		releaseCallback()
+		<-maintained
+	})
+
+	// a connect whose address arrives just as it is given up
+	push(syscallRecord(40, 42, "curl", "/usr/bin/curl", "netmon"))
+	time.Sleep(100 * time.Millisecond)
+	go func() {
+		defer close(maintained)
+		stream.maintain(r)
+	}()
+	select {
+	case <-blocking.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("maintenance did not give up the event")
+	}
+
+	pushed := make(chan struct{})
+	go func() {
+		push(auditRecord{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:40): saddr=020001BBC000020A0000000000000000`})
+		close(pushed)
+	}()
+	select {
+	case <-pushed:
+		t.Fatalf("a record was pushed while its event was being given up")
+	case <-time.After(100 * time.Millisecond):
+	}
+	releaseCallback()
+	select {
+	case <-pushed:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("the late record was not pushed after the event was given up")
+	}
+
+	// the late record did not start a new event that holds this one back
+	push(
+		syscallRecord(41, 42, "curl", "/usr/bin/curl", "netmon"),
+		auditRecord{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:41): saddr=020001BBC000020A0000000000000000`},
+		proctitleRecord(41),
+	)
+	got := rec.dispatched()
+	if len(got) != 1 || got[0].Pid != "141" {
+		t.Fatalf("expected only the second connect to be dispatched, right away, got %+v", got)
+	}
+}
+
+func TestSyscallEventsAreBounded(t *testing.T) {
+	r, stream, _, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+
+	for seq := 1; seq <= 10000; seq++ {
+		pushRecords(t, r, stream, []auditRecord{syscallRecord(seq, 44, "python3", "/usr/bin/python3.12", "netmon")})
+	}
+
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+	// at most the events the reassembler holds, plus the one being added
+	if n := len(stream.syscallEvents); n > reassemblerMaxInFlight+1 {
+		t.Fatalf("expected at most %d tracked events, got %d", reassemblerMaxInFlight+1, n)
+	}
+}
+
 func TestReassemblyDropsSendWithoutAddress(t *testing.T) {
 	r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
 
 	// send() on a connected socket: sendto with no SOCKADDR record
-	pushRecords(t, r, []auditRecord{syscallRecord(42, 44, "python3", "/usr/bin/python3.12", "netmon"), proctitleRecord(42), eoeRecord(42)})
+	pushRecords(t, r, stream, []auditRecord{syscallRecord(42, 44, "python3", "/usr/bin/python3.12", "netmon"), proctitleRecord(42), eoeRecord(42)})
 
 	if stream.delivered.Load() != 1 {
 		t.Fatalf("expected the event to be delivered once, got %d", stream.delivered.Load())
@@ -239,7 +414,7 @@ func TestReassemblyDoesNotKeepIncompleteEvents(t *testing.T) {
 	// records that never complete (no PROCTITLE or EOE) must not pile up
 	const events = 10000
 	for seq := 1; seq <= events; seq++ {
-		pushRecords(t, r, []auditRecord{syscallRecord(seq, 44, "python3", "/usr/bin/python3.12", "netmon")})
+		pushRecords(t, r, stream, []auditRecord{syscallRecord(seq, 44, "python3", "/usr/bin/python3.12", "netmon")})
 	}
 
 	// 50 is Auditbeat's default; compared as a literal so a change to the limit is caught
@@ -255,7 +430,7 @@ func TestReassemblyGivesUpOnEventsAfterTimeout(t *testing.T) {
 	r, stream, rec, _ := newTestReassembler(t, reassemblerMaxInFlight, 50*time.Millisecond)
 
 	// a connect whose last records never arrive
-	pushRecords(t, r, []auditRecord{
+	pushRecords(t, r, stream, []auditRecord{
 		syscallRecord(60, 42, "curl", "/usr/bin/curl", "netmon"),
 		{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:60): saddr=020001BBC000020A0000000000000000`},
 	})
@@ -277,11 +452,11 @@ func TestReassemblyGivesUpOnEventsAfterTimeout(t *testing.T) {
 }
 
 func TestReassemblyCountsLostEvents(t *testing.T) {
-	r, _, _, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+	r, stream, _, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
 
 	// sequences 71 to 74 never arrive
-	pushRecords(t, r, []auditRecord{syscallRecord(70, 42, "curl", "/usr/bin/curl", "netmon"), proctitleRecord(70)})
-	pushRecords(t, r, []auditRecord{syscallRecord(75, 42, "curl", "/usr/bin/curl", "netmon"), proctitleRecord(75)})
+	pushRecords(t, r, stream, []auditRecord{syscallRecord(70, 42, "curl", "/usr/bin/curl", "netmon"), proctitleRecord(70)})
+	pushRecords(t, r, stream, []auditRecord{syscallRecord(75, 42, "curl", "/usr/bin/curl", "netmon"), proctitleRecord(75)})
 
 	if got := p.sequenceGaps.Load(); got != 4 {
 		t.Fatalf("expected a gap of 4, got %d", got)
@@ -306,10 +481,10 @@ func TestEventsLostIgnoresImpossibleGaps(t *testing.T) {
 }
 
 func TestReassemblyCountsRecordFieldErrors(t *testing.T) {
-	r, _, rec, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+	r, stream, rec, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
 
 	// a valid header with an address that cannot be decoded
-	pushRecords(t, r, []auditRecord{
+	pushRecords(t, r, stream, []auditRecord{
 		syscallRecord(90, 42, "curl", "/usr/bin/curl", "netmon"),
 		{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:90): saddr=ZZZZ`},
 		proctitleRecord(90),
@@ -328,8 +503,8 @@ func TestReassemblyHandlesShortSocketAddresses(t *testing.T) {
 	// too short for the family, for AF_INET and for AF_INET6
 	for _, saddr := range []string{"ZZ", "02", "", "0200", "02000050", "0A00", "0A0001BB"} {
 		t.Run(fmt.Sprintf("saddr=%q", saddr), func(t *testing.T) {
-			r, _, rec, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
-			pushRecords(t, r, []auditRecord{
+			r, stream, rec, p := newTestReassembler(t, reassemblerMaxInFlight, reassemblerTimeout)
+			pushRecords(t, r, stream, []auditRecord{
 				syscallRecord(91, 42, "curl", "/usr/bin/curl", "netmon"),
 				{auparse.AUDIT_SOCKADDR, `audit(1700000000.000:91): saddr=` + saddr},
 				proctitleRecord(91),

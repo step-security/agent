@@ -181,7 +181,8 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 		dispatch = func(event *Event) { go eventHandler.HandleEvent(event) }
 	}
 
-	reassembler, err := libaudit.NewReassembler(reassemblerMaxInFlight, reassemblerTimeout, &auditStream{monitor: p, dispatch: dispatch})
+	stream := &auditStream{monitor: p, dispatch: dispatch}
+	reassembler, err := libaudit.NewReassembler(reassemblerMaxInFlight, reassemblerTimeout, stream)
 	if err != nil {
 		return errors.Wrap(err, "create reassembler")
 	}
@@ -190,13 +191,13 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 	maintaining.Add(1)
 	go func() {
 		defer maintaining.Done()
-		maintainReassembler(reassembler, done)
+		maintainReassembler(stream, reassembler, done)
 	}()
 	// stop maintenance before the final flush, so no callback runs after return
 	defer func() {
 		close(done)
 		maintaining.Wait()
-		reassembler.Close()
+		stream.flush(reassembler)
 	}()
 
 	for {
@@ -219,15 +220,18 @@ func (p *ProcessMonitor) receive(r *libaudit.AuditClient) error {
 			continue
 		}
 
-		if err := reassembler.Push(rawEvent.Type, rawEvent.Data); err != nil {
+		message, err := auparse.Parse(rawEvent.Type, string(rawEvent.Data))
+		if err != nil {
 			noteLoss(&p.invalidRecords, 1, fmt.Sprintf("dropped audit record with an invalid header: %v", err))
+			continue
 		}
+		stream.push(reassembler, message)
 	}
 }
 
 // maintainReassembler gives up on events whose last record did not arrive in
 // time, as Auditbeat does, until done is closed.
-func maintainReassembler(r *libaudit.Reassembler, done <-chan struct{}) {
+func maintainReassembler(s *auditStream, r *libaudit.Reassembler, done <-chan struct{}) {
 	ticker := time.NewTicker(reassemblerMaintain)
 	defer ticker.Stop()
 	for {
@@ -235,7 +239,7 @@ func maintainReassembler(r *libaudit.Reassembler, done <-chan struct{}) {
 		case <-done:
 			return
 		case <-ticker.C:
-			if err := r.Maintain(); err != nil {
+			if err := s.maintain(r); err != nil {
 				return
 			}
 		}
