@@ -36,7 +36,7 @@ func InitGlobalFeatureFlags(apiURL string, apiClient *ApiClient) {
 	globalOnce.Do(func() {
 		globalManager = &GlobalFeatureFlagManager{
 			apiURL:    apiURL,
-			flags:     GlobalFeatureFlags{}, // Default values
+			flags:     defaultGlobalFeatureFlags(),
 			apiClient: apiClient,
 		}
 		// Fetch initial flags and handle errors gracefully
@@ -68,10 +68,10 @@ func RefreshGlobalFeatureFlags() error {
 }
 
 // GetGlobalFeatureFlags returns the current global feature flags.
-// This method never returns nil. It returns a default-initialized struct if manager is not initialized.
+// This method never returns nil. It returns default flags if manager is not initialized.
 func GetGlobalFeatureFlags() GlobalFeatureFlags {
 	if globalManager == nil {
-		return GlobalFeatureFlags{} // Return default-initialized struct
+		return defaultGlobalFeatureFlags()
 	}
 	globalManager.mutex.RLock()
 	defer globalManager.mutex.RUnlock()
@@ -86,4 +86,11 @@ func IsArmourEnabled() bool {
 func IsCustomDetectionRulesEnabled() bool {
 	flags := GetGlobalFeatureFlags()
 	return flags.EnableCustomDetectionRules
+}
+
+// defaultGlobalFeatureFlags returns the flags used when they could not be fetched.
+func defaultGlobalFeatureFlags() GlobalFeatureFlags {
+	return GlobalFeatureFlags{
+		RevertGithubDNSExperiment: true,
+	}
 }
