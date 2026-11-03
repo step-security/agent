@@ -123,7 +123,7 @@ func (apiclient *ApiClient) getGlobalFeatureFlags() GlobalFeatureFlags {
 
 	u, err := url.Parse(apiclient.APIURL)
 	if err != nil {
-		return GlobalFeatureFlags{}
+		return defaultGlobalFeatureFlags()
 	}
 
 	u.Path = path.Join(u.Path, "global-feature-flags")
@@ -138,27 +138,27 @@ func (apiclient *ApiClient) getGlobalFeatureFlags() GlobalFeatureFlags {
 
 	if err != nil {
 		fmt.Println("Error creating request:", err)
-		return GlobalFeatureFlags{}
+		return defaultGlobalFeatureFlags()
 	}
 
 	resp, err := apiclient.Client.Do(req)
 
 	if err != nil {
 		fmt.Println("Error sending request:", err)
-		return GlobalFeatureFlags{}
+		return defaultGlobalFeatureFlags()
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("Error reading response body:", err)
-		return GlobalFeatureFlags{}
+		return defaultGlobalFeatureFlags()
 	}
 
 	var globalFeatureFlags GlobalFeatureFlags
 	err = json.Unmarshal(body, &globalFeatureFlags)
 	if err != nil {
 		fmt.Println("Error unmarshalling response body:", err)
-		return GlobalFeatureFlags{}
+		return defaultGlobalFeatureFlags()
 	}
 
 	return globalFeatureFlags
