@@ -77,6 +77,9 @@ func Run(ctx context.Context, configFilePath string, hostDNSServer DNSServer,
 	WriteLog(fmt.Sprintf("%s %s", StepSecurityLogCorrelationPrefix, config.CorrelationId))
 	WriteLog("\n")
 
+	// before DNS servers start, as wildcard lookups insert firewall rules
+	initDefaultInterface()
+
 	InitGlobalFeatureFlags(config.APIURL, apiclient)
 	WriteLog("initialized global feature flags")
 	WriteLog("\n")
