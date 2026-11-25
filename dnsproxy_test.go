@@ -252,3 +252,49 @@ func Test_matchWildcardDomain(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveDomain_Fallback(t *testing.T) {
+	apiclient := &ApiClient{Client: &http.Client{}}
+	httpmock.ActivateNonDefault(apiclient.Client)
+	defer httpmock.DeactivateAndReset()
+	proxy := &DNSProxy{ApiClient: apiclient}
+
+	aRecord := func(domain, ip string) string {
+		return `{"Status":0,"Answer":[{"name":"` + domain + `","type":1,"TTL":60,"data":"` + ip + `"}]}`
+	}
+
+	tests := []struct {
+		domain       string
+		googleStatus int
+		googleBody   string
+		cfBody       string
+		wantIP       string // empty: error expected
+		wantCFCalls  int
+	}{
+		{"ok.com.", 200, aRecord("ok.com.", "5.6.7.8"), aRecord("ok.com.", "1.2.3.4"), "5.6.7.8", 0},
+		{"servfail.com.", 200, `{"Status":2}`, aRecord("servfail.com.", "1.2.3.4"), "1.2.3.4", 1},
+		{"http500.com.", 500, "error", aRecord("http500.com.", "1.2.3.4"), "1.2.3.4", 1},
+		{"badjson.com.", 200, "not json", aRecord("badjson.com.", "1.2.3.4"), "1.2.3.4", 1},
+		{"nxdomain.com.", 200, `{"Status":3}`, `{"Status":3}`, "", 1},
+		{"bothfail.com.", 200, `{"Status":2}`, `{"Status":2}`, "", 1},
+	}
+
+	for _, tt := range tests {
+		cfURL := "https://cloudflare-dns.com/dns-query?name=" + tt.domain + "&type=A"
+		httpmock.RegisterResponder("GET", "https://dns.google/resolve?name="+tt.domain+"&type=a",
+			httpmock.NewStringResponder(tt.googleStatus, tt.googleBody))
+		httpmock.RegisterResponder("GET", cfURL, httpmock.NewStringResponder(200, tt.cfBody))
+
+		answer, err := proxy.ResolveDomain(tt.domain)
+		if tt.wantIP == "" {
+			if err == nil {
+				t.Errorf("%s: expected error, got %v", tt.domain, answer)
+			}
+		} else if err != nil || answer.Data != tt.wantIP {
+			t.Errorf("%s: expected %s, got %v %v", tt.domain, tt.wantIP, answer, err)
+		}
+		if n := httpmock.GetCallCountInfo()["GET "+cfURL]; n != tt.wantCFCalls {
+			t.Errorf("%s: cloudflare calls = %d, want %d", tt.domain, n, tt.wantCFCalls)
+		}
+	}
+}

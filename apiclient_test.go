@@ -21,7 +21,7 @@ func Test_getGithubMetaDomains(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		fmt.Fprint(w, `{"domains":{"actions":["github.com","api.github.com","codeload.github.com","*.github.com","*.actions.githubusercontent.com","objects.githubusercontent.com"]}}`)
+		fmt.Fprint(w, `{"domains":{"actions":["github.com","api.github.com","codeload.github.com","*.github.com","*.actions.githubusercontent.com","objects.githubusercontent.com","productionresultssa0.blob.core.windows.net","productionresultssa188.blob.core.windows.net","other.blob.core.windows.net"]}}`)
 	}))
 	defer server.Close()
 
@@ -40,13 +40,15 @@ func Test_getGithubMetaDomains(t *testing.T) {
 		"api.github.com.":      false,
 		"codeload.github.com.": false,
 		"*.github.com.":        false,
+		// Only productionresultssa* blob hosts are covered by the wildcard
+		"other.blob.core.windows.net.": false,
 	}
 	for _, e := range endpoints {
 		if e.port != 443 {
 			t.Fatalf("endpoint %s port = %d, want 443", e.domainName, e.port)
 		}
 		if _, ok := want[e.domainName]; !ok {
-			t.Fatalf("unexpected endpoint %q; want Fqdn form, githubusercontent.com domains filtered out", e.domainName)
+			t.Fatalf("unexpected endpoint %q; want Fqdn form, githubusercontent.com and productionresultssa* domains filtered out", e.domainName)
 		}
 		want[e.domainName] = true
 	}
