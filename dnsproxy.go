@@ -120,53 +120,57 @@ func (proxy *DNSProxy) ResolveDomain(domain string) (*Answer, error) {
 	url := fmt.Sprintf("https://dns.google/resolve?name=%s&type=a", domain)
 	fallbackUrl := fmt.Sprintf("https://cloudflare-dns.com/dns-query?name=%s&type=A", domain)
 	retryCounter := 0
-	var httpError error
-	var resp *http.Response
+	var resolveErr error
 	for retryCounter < 2 {
 		requestUrl := url
 		if retryCounter == 1 {
 			requestUrl = fallbackUrl
+			WriteLog(fmt.Sprintf("dns.google failed to resolve %s: %v, retrying with cloudflare-dns.com", domain, resolveErr))
 		}
+		retryCounter++
 		req, _ := http.NewRequest("GET", requestUrl, nil)
 		req.Header.Add("accept", "application/dns-json")
-		resp, httpError = proxy.ApiClient.Client.Do(req)
+		resp, httpError := proxy.ApiClient.Client.Do(req)
 		if httpError != nil {
-			retryCounter++
-		} else {
-			break
+			resolveErr = fmt.Errorf("error in response from dns.google %v", httpError)
+			continue
 		}
-	}
 
-	if httpError != nil {
-		return nil, fmt.Errorf("error in response from dns.google %v", httpError)
-	}
+		body, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err == nil && resp.StatusCode != http.StatusOK {
+			err = fmt.Errorf("http status %d", resp.StatusCode)
+		}
 
-	defer resp.Body.Close()
+		var dnsReponse DNSResponse
+		if err == nil {
+			err = json.Unmarshal(body, &dnsReponse)
+		}
 
-	body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			resolveErr = fmt.Errorf("error in response from dns.google %v", err)
+			continue
+		}
 
-	if err != nil {
-		return nil, fmt.Errorf("error in response from dns.google %v", err)
-	}
-
-	var dnsReponse DNSResponse
-
-	err = json.Unmarshal([]byte(body), &dnsReponse)
-
-	if err != nil {
-		return nil, fmt.Errorf("error in response from dns.google %v", err)
-	}
-
-	for _, answer := range dnsReponse.Answer {
-		if answer.Type == 1 {
-			if answer.TTL < 30 {
-				answer.TTL = 30 // less than 30 will cause too frequent DNS requests in audit scenario
+		for _, answer := range dnsReponse.Answer {
+			if answer.Type == 1 {
+				if answer.TTL < 30 {
+					answer.TTL = 30 // less than 30 will cause too frequent DNS requests in audit scenario
+				}
+				if retryCounter == 2 {
+					WriteLog(fmt.Sprintf("cloudflare-dns.com resolved %s", domain))
+				}
+				return &answer, nil
 			}
-			return &answer, nil
 		}
+
+		resolveErr = fmt.Errorf("unable to resolve domain %s, status %d", domain, dnsReponse.Status)
 	}
 
-	return nil, fmt.Errorf("unable to resolve domain %s, status %d", domain, dnsReponse.Status)
+	if retryCounter == 2 {
+		WriteLog(fmt.Sprintf("cloudflare-dns.com failed to resolve %s: %v", domain, resolveErr))
+	}
+	return nil, resolveErr
 }
 
 func getDomainFromCloudAppFormat(domain string) string {

@@ -203,8 +203,9 @@ type GithubMetaResponse struct {
 }
 
 // getGithubMetaDomains fetches the GitHub Actions domains from the meta API.
-// Domains under githubusercontent.com are skipped since they are already
-// covered by the hardcoded wildcard implicit endpoints.
+// Domains under githubusercontent.com and productionresultssa*.blob.core.windows.net
+// are skipped since they are already covered by the hardcoded wildcard implicit
+// endpoints.
 func (apiclient *ApiClient) getGithubMetaDomains() ([]Endpoint, error) {
 	url := fmt.Sprintf("%s/github/meta", apiclient.APIURL)
 
@@ -244,6 +245,9 @@ func (apiclient *ApiClient) getGithubMetaDomains() ([]Endpoint, error) {
 		var endpoints []Endpoint
 		for _, domain := range meta.Domains.Actions {
 			if strings.HasSuffix(domain, "githubusercontent.com") {
+				continue
+			}
+			if strings.HasPrefix(domain, "productionresultssa") && strings.HasSuffix(domain, ".blob.core.windows.net") {
 				continue
 			}
 			// Fqdn form (trailing dot) is required for wildcard matching:

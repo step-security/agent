@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
@@ -13,7 +17,8 @@ const (
 	outputChain               = "OUTPUT"
 	dockerUserChain           = "DOCKER-USER"
 	dockerInterface           = "docker0"
-	defaultInterface          = "eth0"
+	fallbackInterface         = "eth0"
+	procNetRoutePath          = "/proc/net/route"
 	inbound                   = "-i"
 	outbound                  = "-o"
 	protocol                  = "-p"
@@ -38,9 +43,76 @@ const (
 	AllZeros                  = "0.0.0.0"
 )
 
+// interface carrying the default route; not always eth0 (e.g. enp39s0 on AWS-hosted runners)
+var defaultInterface = fallbackInterface
+
 type ipAddressEndpoint struct {
 	ipAddress string
 	port      string
+}
+
+// initDefaultInterface sets defaultInterface from the default route, falling back to eth0
+func initDefaultInterface() {
+	iface, err := detectDefaultInterface(procNetRoutePath)
+	if err != nil {
+		WriteLog(fmt.Sprintf("unable to detect default interface, using %s: %v", fallbackInterface, err))
+		WriteAnnotation(fmt.Sprintf("%s Unable to detect default network interface, using %s: %v", StepSecurityAnnotationPrefix, fallbackInterface, err))
+		defaultInterface = fallbackInterface
+		return
+	}
+
+	defaultInterface = iface
+	WriteLog(fmt.Sprintf("default interface: %s", defaultInterface))
+}
+
+func detectDefaultInterface(routeFile string) (string, error) {
+	f, err := os.Open(routeFile)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	return parseDefaultInterface(f)
+}
+
+// parseDefaultInterface returns the lowest-metric default route interface from /proc/net/route content
+func parseDefaultInterface(r io.Reader) (string, error) {
+	scanner := bufio.NewScanner(r)
+	scanner.Scan() // header
+
+	iface := ""
+	bestMetric := -1
+	for scanner.Scan() {
+		// Iface Destination Gateway Flags RefCnt Use Metric Mask ...
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 8 || fields[1] != "00000000" || fields[7] != "00000000" {
+			continue
+		}
+
+		flags, err := strconv.ParseUint(fields[3], 16, 32)
+		if err != nil || flags&0x1 == 0 { // RTF_UP
+			continue
+		}
+
+		metric, err := strconv.Atoi(fields[6])
+		if err != nil {
+			continue
+		}
+
+		if bestMetric == -1 || metric < bestMetric {
+			iface, bestMetric = fields[0], metric
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	if iface == "" {
+		return "", errors.New("no default route found")
+	}
+
+	return iface, nil
 }
 
 func addBlockRulesForGitHubHostedRunner(firewall *Firewall, endpoints []ipAddressEndpoint) error {
@@ -332,17 +404,17 @@ func AddAuditRules(firewall *Firewall) error {
 	// deny DNS on port 53, else it interferes with DNS proxy
 	// Do not Deny UDP overall as developers may be using it, e.g. MS QUIC
 	// https://github.com/step-security/harden-runner/issues/112
-	err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "--dport", "53", "-j", "DROP")
-	//err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "udp", "-j", "DROP")
+	err = ipt.Append("filter", "OUTPUT", "-o", defaultInterface, "-p", "udp", "--dport", "53", "-j", "DROP")
+	//err = ipt.Append("filter", "OUTPUT", "-o", defaultInterface, "-p", "udp", "-j", "DROP")
 	if err != nil {
 		return errors.Wrap(err, "failed to deny udp")
 	}
 
 	// this limits the number of packets sent to nflog. Only SYN requests are sent
-	err = ipt.Append("filter", "OUTPUT", "-o", "eth0", "-p", "tcp", "--tcp-flags", "SYN,ACK", "SYN", "-j", "NFLOG", "--nflog-group", "100")
+	err = ipt.Append("filter", "OUTPUT", "-o", defaultInterface, "-p", "tcp", "--tcp-flags", "SYN,ACK", "SYN", "-j", "NFLOG", "--nflog-group", "100")
 
 	if err != nil {
-		return fmt.Errorf("Append failed for eth0: %v", err)
+		return fmt.Errorf("Append failed for %s: %v", defaultInterface, err)
 	}
 
 	err = ipt.ClearChain("filter", "DOCKER-USER")
