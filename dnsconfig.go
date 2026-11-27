@@ -25,7 +25,7 @@ const (
 	// https://unix.stackexchange.com/questions/508397/what-is-the-recommended-way-to-set-a-global-dns-server-override-on-a-system-usin
 	// Domains=~. instructs systemd-resolved to always use the global nameservers
 	// and to never query any DHCP-supplied nameservers
-	localDnsServer = "[Resolve]\nDNS=127.0.0.1\nDomains=~.\n"
+	localDnsServer = "[Resolve]\nDNS=127.0.0.1 172.17.0.1\nDomains=~.\n"
 )
 
 func updateDockerConfig(configPath string) error {
@@ -46,7 +46,7 @@ func updateDockerConfig(configPath string) error {
 		return errors.Wrap(err, "failed to unmarshal config file")
 	}
 
-	m["dns"] = []string{dockerDnsServer}
+	// m["dns"] = []string{dockerDnsServer}
 	m["live-restore"] = true
 	// m["userns-remap"] = "runner:runner" // Checkout: https://docs.docker.com/engine/security/userns-remap/#enable-userns-remap-on-the-daemon
 
